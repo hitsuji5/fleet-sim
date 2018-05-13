@@ -46,7 +46,7 @@ class Occupied(VehicleBehavior):
         arrived = vehicle.update_time_to_destination(timestep)
         if arrived:
             customer = vehicle.dropoff()
-            customer.getoff()
+            customer.get_off()
             # env.models.customer.customer_repository.CustomerRepository.delete(customer.get_id())
 
 class Assigned(VehicleBehavior):

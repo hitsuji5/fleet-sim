@@ -79,7 +79,7 @@ class Vehicle(object):
 
     def dropoff(self):
         assert len(self.__customers) > 0
-        assert self.get_location() == self.__customers[0].get_destination_road()
+        assert self.get_location() == self.__customers[0].get_destination()
         customer = self.__customers.pop(0)
 
         self.__reset_plan()
