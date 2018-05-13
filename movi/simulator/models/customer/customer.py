@@ -17,11 +17,11 @@ class Customer(object):
         return customer_id
 
     def get_origin(self):
-        origin = self.request.origin_latitude, self.request.origin_longitude
+        origin = self.request.origin_lat, self.request.origin_lon
         return origin
 
     def get_destination(self):
-        destination = self.request.destination_latitude, self.request.destination_longitude
+        destination = self.request.destination_lat, self.request.destination_lon
         return destination
 
     def get_trip_duration(self):

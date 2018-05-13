@@ -6,7 +6,7 @@ from .q_network import DeepQNetwork, FittingDeepQNetwork
 from agent.dispatch_policy import DispatchPolicy
 from . import settings
 from common.time_utils import get_local_datetime
-from common import vehicle_status_codes
+from common import vehicle_status_codes, mesh
 
 class DQNDispatchPolicy(DispatchPolicy):
 
@@ -48,8 +48,8 @@ class DQNDispatchPolicy(DispatchPolicy):
     def convert_action_to_destination(self, vehicle_state, a):
         R = settings.MAX_MOVE
         x_, y_ = [(x, y) for x in range(-R, R + 1) for y in range(-R, R + 1)][a]
-        x, y = self.feature_constructor.convert_lonlat_to_xy(vehicle_state.lon, vehicle_state.lat)
-        lon, lat = self.feature_constructor.convert_xy_to_lonlat(x + x_, y + y_)
+        x, y = mesh.convert_lonlat_to_xy(vehicle_state.lon, vehicle_state.lat)
+        lon, lat = mesh.convert_xy_to_lonlat(x + x_, y + y_)
         return lat, lon
 
     def moves_iter(self, min_moves=0):

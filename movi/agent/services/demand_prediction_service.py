@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from db import engine
 from common.time_utils import get_local_datetime
+from config.settings import MAP_WIDTH, MAP_HEIGHT
 
 class DemandPredictionService(object):
 
@@ -26,7 +27,7 @@ class DemandPredictionService(object):
             x += self.timestep / 3600.0
             demand.append(d)
 
-        return np.array(demand)
+        return demand
 
 
     def __compute_demand(self, x, d):
@@ -34,31 +35,28 @@ class DemandPredictionService(object):
 
     def update_hourly_demand(self, t):
         localtime = get_local_datetime(t - 60 * 30)
-        dayofweek, hourofday = localtime.weekday(), localtime.hour
-        if len(self.hourly_demand) == 0 or self.current_time != (dayofweek, hourofday):
-            self.current_time = (dayofweek, hourofday)
-            demand1 = self.get_hourly_demand(dayofweek, hourofday)
-
-            localtime = get_local_datetime(t + 60 * 30)
-            dayofweek, hourofday = localtime.weekday(), localtime.hour
-            demand2 = self.get_hourly_demand(dayofweek, hourofday)
-
-            localtime = get_local_datetime(t + 60 * 90)
-            dayofweek, hourofday = localtime.weekday(), localtime.hour
-            demand3 = self.get_hourly_demand(dayofweek, hourofday)
-
+        current_time = localtime.month, localtime.day, localtime.hour
+        if len(self.hourly_demand) == 0 or self.current_time != current_time:
+            self.current_time = current_time
+            demand1 = self.get_hourly_demand(t - 60 * 30)
+            demand2 = self.get_hourly_demand(t + 60 * 30)
+            demand3 = self.get_hourly_demand(t + 60 * 90)
             self.hourly_demand = [demand1, demand2, demand3]
 
         x = (localtime.minute - 30) / 60.0
         return x
 
-    def get_hourly_demand(self, dayofweek, hourofday):
+    def get_hourly_demand(self, t):
+        localtime = get_local_datetime(t)
+        month, day, hour = localtime.month, localtime.day, localtime.hour
         query = """
-                          SELECT x, y, demand
-                          FROM taxi.demand_trend
-                          WHERE dayofweek = {dayofweek} and hourofday = {hourofday};
-                            """.format(dayofweek=dayofweek, hourofday=hourofday)
-        demand = pd.read_sql(query, engine, index_col=["x", "y"]).demand.to_dict()
-        # demand = np.array([demand.get(road_id, 0) for road_id in RoadNetwork.road_ids])
-        return demand
+          SELECT x, y, demand
+          FROM predicted_demand
+          WHERE month = {month} and day = {day} and hour = {hour};
+                """.format(month=month, day=day, hour=hour)
+        demand = pd.read_sql(query, engine, index_col=["x", "y"]).demand
+        dmap = np.zeros((MAP_WIDTH, MAP_HEIGHT))
+        for (x, y), c in demand.iteritems():
+            dmap[x, y] += c
+        return dmap
 

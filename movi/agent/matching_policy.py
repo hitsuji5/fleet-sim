@@ -7,7 +7,6 @@ class MatchingPolicy(object):
 
     def find_available_vehicles(self, vehicles):
         idle_vehicles = vehicles[(vehicles.status == vehicle_status_codes.IDLE) |
-                                 (vehicles.status == vehicle_status_codes.AT_STAND) |
                                  (vehicles.status == vehicle_status_codes.CRUISING)]
         return idle_vehicles
 
@@ -26,11 +25,10 @@ class RoughMatchingPolicy(MatchingPolicy):
         assignments = []
         vehicles = self.find_available_vehicles(vehicles)
         n_vehicles = len(vehicles)
-        if n_vehicles > 0:
+        if n_vehicles == 0:
             return assignments
-        d = great_circle_distance(vehicles.latitude.values, vehicles.longitude.values,
-                                  requests.origin_latitude.values[:, None], requests.origin_longitude.values[:, None])
-
+        d = great_circle_distance(vehicles.lat.values, vehicles.lon.values,
+                                  requests.origin_lat.values[:, None], requests.origin_lon.values[:, None])
         for rid, customer_id in enumerate(requests.index):
             vid = d[rid].argmin()
             if d[rid, vid] < self.reject_distance:

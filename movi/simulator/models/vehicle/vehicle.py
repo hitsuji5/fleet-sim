@@ -94,14 +94,15 @@ class Vehicle(object):
         sim_logger.log_vehicle_event("park", self.state.to_msg())
 
     def update_location(self, location, route):
-        self.state.location = location
+        self.state.lat, self.state.lon = location
         self.__route_plan = route
 
     def update_time_to_destination(self, timestep):
         self.state.time_to_destination = max(self.state.time_to_destination - timestep, 0)
         if self.state.time_to_destination <= 0:
             self.state.time_to_destination = 0
-            self.state.location = self.state.destination
+            self.state.lat = self.state.destination_lat
+            self.state.lon = self.state.destination_lon
             return True
         else:
             return False
@@ -145,12 +146,12 @@ class Vehicle(object):
         self.__route_plan = []
 
     def __set_route(self, route, speed):
-        assert self.state.location == route[0]
+        assert self.get_location() == route[0]
         self.__route_plan = route
         self.state.speed = speed
 
     def __set_destination(self, destination, triptime):
-        self.state.destination = destination
+        self.state.destination_lat, self.state.destination_lon = destination
         self.state.time_to_destination = triptime
 
 

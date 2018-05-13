@@ -5,7 +5,6 @@ from .services.routing_service import RoutingService
 
 
 from config.settings import IDLE_DURATION_LIMIT, REST_PROBABILITY, REST_DURATION
-from db import Session
 import numpy as np
 from logger import sim_logger
 from logging import getLogger
@@ -39,17 +38,10 @@ class Simulator(object):
 
         for vehicle in VehicleRepository.get_all():
             vehicle.step(self.__dt)
-            if vehicle.get_idle_duration >= IDLE_DURATION_LIMIT and np.random.random() < REST_PROBABILITY:
+            if vehicle.get_idle_duration() >= IDLE_DURATION_LIMIT and np.random.random() < REST_PROBABILITY:
                 vehicle.take_rest(np.random.randint(REST_DURATION))
 
-        try:
-            self.__populate_new_customers()
-        except:
-            Session.rollback()
-            raise
-        finally:
-            Session.remove()
-
+        self.__populate_new_customers()
         self.__update_time()
 
     def match_vehicles(self, commands):
@@ -59,11 +51,11 @@ class Simulator(object):
         for command in commands:
             vehicle = VehicleRepository.get(command["vehicle_id"])
             if vehicle is None:
-                self.logger.warn("Invalid Vehicle id")
+                self.logger.warning("Invalid Vehicle id")
                 continue
             customer = CustomerRepository.get(command["customer_id"])
             if customer is None:
-                self.logger.warn("Invalid Customer id")
+                self.logger.warning("Invalid Customer id")
                 continue
 
             vehicles.append(vehicle)
@@ -83,7 +75,7 @@ class Simulator(object):
         for command in commands:
             vehicle = VehicleRepository.get(command["vehicle_id"])
             if vehicle is None:
-                self.logger.warn("Invalid Vehicle id")
+                self.logger.warning("Invalid Vehicle id")
                 continue
             vehicles.append(vehicle)
             od_pairs.append((vehicle.get_location(), command["destination"]))

@@ -3,7 +3,7 @@ from db import Session
 
 query = """
   SELECT *
-  FROM taxi.{table}
+  FROM {table}
   WHERE request_datetime >= {t1} and request_datetime < {t2};
 """
 
@@ -19,8 +19,14 @@ class DemandGenerator(object):
 
 
     def generate(self, current_time, timestep):
-        requests = Session.execute(query.format(table=self.table, t1=current_time, t2=current_time+timestep))
-        customers = [Customer(request) for request in requests]
+        try:
+            requests = Session.execute(query.format(table=self.table, t1=current_time, t2=current_time + timestep))
+            customers = [Customer(request) for request in requests]
+        except:
+            Session.rollback()
+            raise
+        finally:
+            Session.remove()
         return customers
 
 

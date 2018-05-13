@@ -35,7 +35,8 @@ class Cruising(VehicleBehavior):
                 return
             dist_left -= d
 
-        vehicle.update_location(route[-1], [])
+        if len(route) > 0:
+            vehicle.update_location(route[-1], [])
 
 
 class Occupied(VehicleBehavior):

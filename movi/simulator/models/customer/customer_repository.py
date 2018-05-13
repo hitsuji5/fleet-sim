@@ -6,10 +6,10 @@ class CustomerRepository(object):
         'id',
         'request_datetime',
         'trip_time',
-        'origin_longitude',
-        'origin_latitude',
-        'destination_longitude',
-        'destination_latitude',
+        'origin_lon',
+        'origin_lat',
+        'destination_lon',
+        'destination_lat',
         'fare'
     ]
 

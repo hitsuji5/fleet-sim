@@ -1,10 +1,7 @@
-from config.settings import LON_WIDTH, LAT_WIDTH
+from config.settings import MAP_WIDTH, MAP_HEIGHT
 from common import vehicle_status_codes
 
-DELTA_LON = 45.0 / 3600
-DELTA_LAT = 30.0 / 3600
-MAP_WIDTH = int(LON_WIDTH * 2 / DELTA_LON)
-MAP_HEIGHT = int(LAT_WIDTH * 2 / DELTA_LAT)
+
 INPUT_SHAPE = (MAP_WIDTH, MAP_HEIGHT, 10, )
 MAX_MOVE = 4
 FEATURE_MAP_SIZE = (MAX_MOVE + 6) * 2 + 1

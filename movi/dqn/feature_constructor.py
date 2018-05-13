@@ -1,8 +1,8 @@
 import numpy as np
 from common.time_utils import get_local_datetime
-from config.settings import CENTER_LATITUDE, CENTER_LONGITUDE, LON_WIDTH, LAT_WIDTH
-from .settings import MAP_WIDTH, MAP_HEIGHT, DELTA_LON, DELTA_LAT, FEATURE_MAP_SIZE
-from common import vehicle_status_codes
+from config.settings import MAP_WIDTH, MAP_HEIGHT
+from .settings import FEATURE_MAP_SIZE
+from common import vehicle_status_codes, mesh
 
 class FeatureConstructor(object):
 
@@ -28,8 +28,6 @@ class FeatureConstructor(object):
 
 
     def update_demand(self, demand):
-        #TODO: construct demand heat maps
-        # self.demand_maps = self.construct_demand_map(demand)
         self.demand_maps = demand
         averaged_demand_map = self.compute_spatial_average(self.demand_maps[-1])
         self.demand_maps.append(averaged_demand_map)
@@ -54,10 +52,11 @@ class FeatureConstructor(object):
 
     def construct_feature_maps(self, maps, location):
         lat, lon = location
-        x, y = self.convert_lonlat_to_xy(lon, lat)
+        x, y = mesh.convert_lonlat_to_xy(lon, lat)
         features = [self.extract_box(m, x, y, FEATURE_MAP_SIZE) for m in maps]
         point_map = self.construct_initial_map(w=FEATURE_MAP_SIZE, h=FEATURE_MAP_SIZE)
-        point_map[(FEATURE_MAP_SIZE - 1) / 2, (FEATURE_MAP_SIZE - 1) / 2] = 1.0
+        center = int((FEATURE_MAP_SIZE - 1) / 2)
+        point_map[center, center] = 1.0
         features += [point_map]
         return features
 
@@ -67,9 +66,9 @@ class FeatureConstructor(object):
 
     def extract_box(self, F, x, y, size):
         X = self.construct_initial_map(w=size, h=size)
-        d = (size - 1) / 2
+        d = int((size - 1) / 2)
         w, h = F.shape
-        X[max(d-x, 0):min(d+w-x, size), max(d-y, 0):min(d+h-y, size)] = F[max(x-w, 0):x+w+1, max(y-w, 0):y+w+1]
+        X[max(d-x, 0):min(d+w-x, size), max(d-y, 0):min(d+h-y, size)] = F[max(x-d, 0):min(x+d+1, w), max(y-d, 0):min(y+d+1, h)]
         return X
 
 
@@ -80,13 +79,13 @@ class FeatureConstructor(object):
     def construct_supply_map(self, locations):
         supply_map = self.construct_initial_map()
         for lon, lat in locations:
-            x, y = self.convert_lonlat_to_xy(lon, lat)
+            x, y = mesh.convert_lonlat_to_xy(lon, lat)
             supply_map[x, y] += 1.0
         return supply_map
 
-    def construct_vehicle_features(self, vehicle):
-        norm_x, norm_y = self.normalize_lonlat(vehicle.longitude, vehicle.latitude)
-        return [norm_x, norm_y]
+    # def construct_vehicle_features(self, vehicle):
+    #     norm_x, norm_y = self.normalize_lonlat(vehicle.longitude, vehicle.latitude)
+    #     return [norm_x, norm_y]
 
     def construct_time_features(self, timestamp):
         t = get_local_datetime(timestamp)
@@ -103,20 +102,8 @@ class FeatureConstructor(object):
         t = self.t
         return t
 
-    def convert_lonlat_to_xy(self, lon, lat):
-        x = (lon - (CENTER_LONGITUDE - LON_WIDTH)) / DELTA_LON
-        x = int(min(max(x, 0), MAP_WIDTH - 1))
-        y = (lat - (CENTER_LATITUDE - LAT_WIDTH)) / DELTA_LAT
-        y = int(min(max(y, 0), MAP_HEIGHT - 1))
-        return x, y
-
-    def convert_xy_to_lonlat(self, x, y):
-        lon = CENTER_LONGITUDE - LON_WIDTH + DELTA_LON * x
-        lat = CENTER_LATITUDE - LAT_WIDTH + DELTA_LAT * y
-        return lon, lat
-
-    def normalize_lonlat(self, lon, lat):
-        x = (lon - CENTER_LONGITUDE) / LON_WIDTH
-        y = (lat - CENTER_LATITUDE) / LAT_WIDTH
-        return x, y
+    # def normalize_lonlat(self, lon, lat):
+    #     x = (lon - CENTER_LONGITUDE) / LON_WIDTH
+    #     y = (lat - CENTER_LATITUDE) / LAT_WIDTH
+    #     return x, y
 
