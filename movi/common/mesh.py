@@ -9,6 +9,6 @@ def convert_lonlat_to_xy(lon, lat):
 
 
 def convert_xy_to_lonlat(x, y):
-    lon = MIN_LON + DELTA_LON * x
-    lat = MIN_LAT + DELTA_LAT * y
+    lon = MIN_LON + DELTA_LON * (int(min(max(x, 0), MAP_WIDTH - 1)) + 0.5)
+    lat = MIN_LAT + DELTA_LAT * (int(min(max(y, 0), MAP_HEIGHT - 1)) + 0.5)
     return lon, lat

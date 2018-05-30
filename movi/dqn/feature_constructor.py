@@ -1,7 +1,7 @@
 import numpy as np
 from common.time_utils import get_local_datetime
 from config.settings import MAP_WIDTH, MAP_HEIGHT
-from .settings import FEATURE_MAP_SIZE
+from .settings import FEATURE_MAP_SIZE, MAX_MOVE
 from common import vehicle_status_codes, mesh
 
 class FeatureConstructor(object):
@@ -45,20 +45,32 @@ class FeatureConstructor(object):
     def update_fingerprint(self, fingerprint):
         self.fingerprint = fingerprint
 
-    def construct_features(self, vehicle):
-        location = vehicle.lat, vehicle.lon
-        features = self.construct_feature_maps(self.get_supply_demand_maps(), location)
-        return features, None
+    def construct_features(self, x, y):
+        features = self.construct_feature_maps(self.get_supply_demand_maps(), (x, y))
+        return features
 
     def construct_feature_maps(self, maps, location):
-        lat, lon = location
-        x, y = mesh.convert_lonlat_to_xy(lon, lat)
+        x, y = location
+        # x, y = mesh.convert_lonlat_to_xy(lon, lat)
         features = [self.extract_box(m, x, y, FEATURE_MAP_SIZE) for m in maps]
         point_map = self.construct_initial_map(w=FEATURE_MAP_SIZE, h=FEATURE_MAP_SIZE)
         center = int((FEATURE_MAP_SIZE - 1) / 2)
         point_map[center, center] = 1.0
         features += [point_map]
+        # features += [self.get_triptime_map(x, y)]
         return features
+
+    def get_triptime_map(self, x, y):
+        size = MAX_MOVE * 2 + 1
+        tt = self.construct_initial_map(w=size, h=size)
+        for x_ in range(-MAX_MOVE, MAX_MOVE + 1):
+            for y_ in range(-MAX_MOVE, MAX_MOVE + 1):
+                if x + x_ < MAP_WIDTH and y + y_ < MAP_HEIGHT and x + x_ >= 0 and y + y_ >= 0:
+                    tt[MAX_MOVE + x_, MAX_MOVE + y_] = np.sqrt(x_ ** 2 + y_ ** 2) / (MAX_MOVE + 1)
+                else:
+                    tt[MAX_MOVE + x_, MAX_MOVE + y_] = 2.0
+        return tt
+
 
     def get_supply_demand_maps(self):
         supply_demand_maps = self.supply_maps + self.demand_maps

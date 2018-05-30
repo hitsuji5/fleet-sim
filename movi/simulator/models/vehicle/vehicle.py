@@ -38,7 +38,7 @@ class Vehicle(object):
             logger.error(self.state.to_msg())
             raise
 
-        sim_logger.log_vehicle_event("step", self.state.to_msg())
+        # sim_logger.log_vehicle_event("step", self.state.to_msg())
 
     def cruise(self, route, triptime, speed):
         assert self.__behavior.available

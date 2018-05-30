@@ -45,13 +45,15 @@ class DeepQNetwork(object):
     def compute_q_values(self, s):
         return self.q_values.eval(
             feed_dict={
-                self.main_input: np.array(s, dtype=np.float32).transpose((0, 3, 2, 1)),
+                self.main_input: np.array([s], dtype=np.float32).transpose((0, 3, 2, 1)),
                 # self.local_input: np.array(local_features, dtype=np.float32)
                 # K.learning_phase(): 0
-            })[:, 0]
+            })[0]
 
-    def get_action(self, s):
-        return np.argmax(self.compute_q_values(s))
+    def get_action(self, s, tt_map):
+        q_values = self.compute_q_values(s)
+        q_values[tt_map.flatten() > 1.0] = -float('inf')
+        return np.argmax(q_values)
 
 
 class FittingDeepQNetwork(DeepQNetwork):
@@ -88,14 +90,15 @@ class FittingDeepQNetwork(DeepQNetwork):
         self.summary_writer = tf.summary.FileWriter(settings.SAVE_SUMMARY_PATH, self.sess.graph)
 
 
-    def get_action(self, s):
+    def get_action(self, s, tt_map):
         # e-greedy exploration
         if self.epsilon > np.random.random():
-            # if 0.5 > np.random.random():
-            #     return get_default_action(s, local_features)
-            return np.random.randint((settings.MAX_MOVE * 2 + 1) ** 2)
+            if settings.WAIT_ACTION_PROBABILITY > np.random.random():
+                return settings.WAIT_ACTION
+            actions = np.arange((settings.MAX_MOVE * 2 + 1) ** 2)[tt_map.flatten() <= 1.0]
+            return np.random.choice(actions)
         else:
-            return super(FittingDeepQNetwork, self).get_action(s)
+            return super(FittingDeepQNetwork, self).get_action(s, tt_map)
 
 
 
@@ -105,10 +108,10 @@ class FittingDeepQNetwork(DeepQNetwork):
     def compute_target_q_values(self, s):
         return self.target_q_values.eval(
             feed_dict={
-                self.target_main_input: np.array(s, dtype=np.float32).transpose((0, 3, 2, 1)),
+                self.target_main_input: np.array([s], dtype=np.float32).transpose((0, 3, 2, 1)),
                 # self.target_local_input: np.array(local_features, dtype=np.float32)
                 # K.learning_phase(): 0
-            })[:, 0]
+            })[0]
 
     def fit(self, s_batch, a_batch, y_batch):
         loss, _ = self.sess.run([self.loss, self.grad_update], feed_dict={
@@ -143,7 +146,7 @@ class FittingDeepQNetwork(DeepQNetwork):
 
         # Convert action to one hot vector
         a_one_hot = tf.one_hot(a, (settings.MAX_MOVE * 2 + 1) ** 2, 1.0, 0.0)
-        q_value = tf.reduce_sum(tf.mul(self.q_values, a_one_hot), reduction_indices=1)
+        q_value = tf.reduce_sum(tf.multiply(self.q_values, a_one_hot), reduction_indices=1)
         # q_value = tf.reduce_sum(self.q_values, reduction_indices=1)
         loss = tf.losses.huber_loss(y, q_value)
         optimizer = tf.train.RMSPropOptimizer(settings.LEARNING_RATE, momentum=settings.MOMENTUM, epsilon=settings.MIN_GRAD)

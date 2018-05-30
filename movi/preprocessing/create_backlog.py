@@ -9,7 +9,8 @@ from db import engine, Session
 
 
 def create_request_backlog(input_file_path, table_name):
-    df= pd.read_csv(input_file_path, nrows=1000000)
+    df= pd.read_csv(input_file_path)
+    print("# of rows {}".format(len(df)))
     df.index.name = 'id'
     drop_table = """
     DROP TABLE IF EXISTS {};

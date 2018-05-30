@@ -1,4 +1,5 @@
 import pickle
+import os
 import numpy as np
 from collections import OrderedDict, defaultdict
 from .feature_constructor import FeatureConstructor
@@ -29,33 +30,37 @@ class DQNDispatchPolicy(DispatchPolicy):
         commands = []
         for vehicle_id, vehicle_state in tbd_vehicles.iterrows():
             a = self.predict_best_action(vehicle_id, vehicle_state)
-            target = self.convert_action_to_destination(vehicle_state, a)
-
             # if vehicle is idle or at stand and command is to stay on current location
-            if target == (vehicle_state.lat, vehicle_state.lon):
+            if a == settings.WAIT_ACTION:
                 continue
+
+            target = self.convert_action_to_destination(vehicle_state, a)
             command = self.create_command(vehicle_id, target)
             commands.append(command)
         return commands
 
     def predict_best_action(self, vehicle_id, vehicle_state):
-        s = self.feature_constructor.construct_features(vehicle_state)
+        x, y = mesh.convert_lonlat_to_xy(vehicle_state.lon, vehicle_state.lat)
+        s = self.feature_constructor.construct_features(x, y)
+        tt_map = self.feature_constructor.get_triptime_map(x, y)
         if self.q_network is None:
-            return 0
+            return settings.WAIT_ACTION
         else:
-            return self.q_network.get_action(s)
+            return self.q_network.get_action(s, tt_map)
 
     def convert_action_to_destination(self, vehicle_state, a):
         R = settings.MAX_MOVE
         x_, y_ = [(x, y) for x in range(-R, R + 1) for y in range(-R, R + 1)][a]
         x, y = mesh.convert_lonlat_to_xy(vehicle_state.lon, vehicle_state.lat)
         lon, lat = mesh.convert_xy_to_lonlat(x + x_, y + y_)
+        assert lon != vehicle_state.lon or lat != vehicle_state.lat
         return lat, lon
 
-    def moves_iter(self, min_moves=0):
-        R = settings.MAX_MOVE
-        return ((x, y) for x in range(-R, R + 1) for y in range(-R, R + 1)
-                if x ** 2 + y ** 2 <= R ** 2 and x ** 2 + y ** 2 >= min_moves ** 2)
+
+    # def moves_iter(self, min_moves=0):
+    #     R = settings.MAX_MOVE
+    #     return ((x, y) for x in range(-R, R + 1) for y in range(-R, R + 1)
+    #             if x ** 2 + y ** 2 <= R ** 2 and x ** 2 + y ** 2 >= min_moves ** 2)
 
 
 
@@ -71,12 +76,12 @@ class DQNDispatchPolicyLearner(DQNDispatchPolicy):
 
 
     def dump_experience_memory(self):
-        pickle.dump(self.supply_demand_history, open(settings.REPLAY_MEMORY_PATH + "sd_history.pkl", "wb"))
-        pickle.dump(self.experience_memory, open(settings.REPLAY_MEMORY_PATH + "ex_memory.pkl", "wb"))
+        pickle.dump(self.supply_demand_history, open(os.path.join(settings.REPLAY_MEMORY_PATH, "sd_history.pkl"), "wb"))
+        pickle.dump(self.experience_memory, open(os.path.join(settings.REPLAY_MEMORY_PATH, "ex_memory.pkl"), "wb"))
 
     def load_experience_memory(self):
-        self.supply_demand_history = pickle.load(open(settings.REPLAY_MEMORY_PATH + "sd_history.pkl", "rb"))
-        self.experience_memory = pickle.load(open(settings.REPLAY_MEMORY_PATH + "ex_memory.pkl", "rb"))
+        self.supply_demand_history = pickle.load(open(os.path.join(settings.REPLAY_MEMORY_PATH, "sd_history.pkl"), "rb"))
+        self.experience_memory = pickle.load(open(os.path.join(settings.REPLAY_MEMORY_PATH, "ex_memory.pkl"), "rb"))
 
         state_action, _, _ = self.experience_memory[0]
         t_start, _, _ = state_action
@@ -135,7 +140,8 @@ class DQNDispatchPolicyLearner(DQNDispatchPolicy):
 
     def memorize_experience(self, vehicle_id, vehicle_state, a):
         current_time = self.feature_constructor.get_current_time()
-        location = vehicle_state.lat, vehicle_state.lon
+        # location = vehicle_state.lat, vehicle_state.lon
+        location = mesh.convert_lonlat_to_xy(vehicle_state.lon, vehicle_state.lat)
         last_state_action = self.last_state_actions.get(vehicle_id, None)
 
         if last_state_action is not None:
@@ -185,7 +191,12 @@ class DQNDispatchPolicyLearner(DQNDispatchPolicy):
             next_supply_demand_map = self.supply_demand_history[next_t]
             next_s = self.feature_constructor.construct_feature_maps(next_supply_demand_map, next_loc)
             target_q_values = self.q_network.compute_target_q_values(next_s)
-            next_a = np.argmax(self.q_network.compute_q_values(next_s))
+
+            tt_map = self.feature_constructor.get_triptime_map(*next_loc)
+            q_values = self.q_network.compute_q_values(s)
+            q_values[tt_map.flatten() > 1.0] = -float('inf')
+            next_a = np.argmax(q_values)
+
             discount_factor = settings.GAMMA ** int((next_t - t) / 60)
             y = reward + discount_factor * target_q_values[next_a]
             return s, a, y

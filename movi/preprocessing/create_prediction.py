@@ -13,6 +13,8 @@ def create_predicted_demand(use_demand_pattern=False):
     request_table = "request_pattern" if use_demand_pattern else "request_backlog"
     query = "SELECT * FROM {}".format(request_table)
     df = pd.read_sql(query, engine, index_col="id")
+    print("# of rows {}".format(len(df)))
+
     df["datetime_obj"] = df.request_datetime.apply(lambda x: get_local_datetime(x))
     df["dayofweek"] = df.datetime_obj.apply(lambda x: x.weekday())
     df["hour"] = df.datetime_obj.apply(lambda x: x.hour)

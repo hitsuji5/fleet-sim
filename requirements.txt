@@ -1,0 +1,5 @@
+psycopg2-binary==2.7.4
+SQLAlchemy==1.2.2
+PyYAML==3.12
+tensorflow==1.8.0
+pandas==0.22.0
