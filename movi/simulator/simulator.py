@@ -18,10 +18,11 @@ class Simulator(object):
         self.demand_generator = DemandGenerator(use_pattern)
         self.routing_service = RoutingService()
 
-    def reset(self, start_time, timestep):
-        self.__t = start_time
-        self.__dt = timestep
-        self.__new_customers = []
+    def reset(self, start_time=None, timestep=None):
+        if start_time is not None:
+            self.__t = start_time
+        if timestep is not None:
+            self.__dt = timestep
         VehicleRepository.init()
         CustomerRepository.init()
 
@@ -33,7 +34,7 @@ class Simulator(object):
     def step(self):
         for customer in CustomerRepository.get_all():
             customer.step(self.__dt)
-            if customer.is_arrived_or_rejected():
+            if customer.is_arrived() or customer.is_disappeared():
                 CustomerRepository.delete(customer.get_id())
 
         for vehicle in VehicleRepository.get_all():
@@ -102,3 +103,8 @@ class Simulator(object):
 
     def get_vehicles_state(self):
         return VehicleRepository.get_states()
+
+    def log_score(self):
+        for vehicle in VehicleRepository.get_all():
+            score = ','.join(map(str, [self.get_current_time()] + vehicle.get_score()))
+            sim_logger.log_score(score)

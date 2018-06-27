@@ -6,8 +6,8 @@ import argparse
 from experiment import Experiment
 from agent.matching_policy import RoughMatchingPolicy
 from dqn.dqn_policy import DQNDispatchPolicy, DQNDispatchPolicyLearner
-from dqn.settings import BATCH_SIZE, NUM_ITERATIONS
-from config.settings import NUM_SIMULATION_STEPS, NUM_VEHICLES, TIMESTEP, START_TIME, NUM_DRY_RUN
+from dqn.settings import BATCH_SIZE, NUM_ITERATIONS, NUM_SUPPLY_DEMAND_HISTORY
+from config.settings import NUM_SIMULATION_STEPS, NUM_VEHICLES, TIMESTEP, START_TIME
 from common.time_utils import get_local_datetime
 
 if __name__ == '__main__':
@@ -35,7 +35,9 @@ if __name__ == '__main__':
             dispatch_policy.build_q_network(load_network=args.load)
 
     if args.train and args.pretrain > 0:
-        dispatch_policy.load_experience_memory()
+        # dispatch_policy.load_experience_memory(NUM_SUPPLY_DEMAND_HISTORY - 1)
+        dispatch_policy.load_experience_memory(NUM_SIMULATION_STEPS)
+
         for i in range(args.pretrain):
             average_loss, average_q_max = dispatch_policy.train_network(BATCH_SIZE, NUM_ITERATIONS)
             print("iterations : {}, average_loss : {:.3f}, average_q_max : {:.3f}".format(i, average_loss, average_q_max))
@@ -43,14 +45,23 @@ if __name__ == '__main__':
 
     matching_policy = RoughMatchingPolicy()
     dqn_exp = Experiment(START_TIME, TIMESTEP, dispatch_policy, matching_policy, use_pattern=args.pattern)
-    dqn_exp.init_vehicles(n_vehicles=NUM_VEHICLES)
-    dqn_exp.dry_run(NUM_DRY_RUN)
 
+    epoch = 3600 * 24 / TIMESTEP
     for i in range(NUM_SIMULATION_STEPS):
+        if i % epoch == 0:
+            dqn_exp.reset()
+            if args.train:
+                dispatch_policy.reset()
+            dqn_exp.populate_vehicles(n_vehicles=NUM_VEHICLES)
+
         if i % int(3600 / TIMESTEP) == 0:
             print("Elapsed : {:.0f} hours".format(i * TIMESTEP / 3600.0))
         dqn_exp.step(verbose=args.verbose)
 
+        if args.train and i % NUM_SUPPLY_DEMAND_HISTORY == NUM_SUPPLY_DEMAND_HISTORY - 1:
+            print("Dumping experience memory as pickle...")
+            dispatch_policy.dump_experience_memory(i)
+
     if args.train:
         print("Dumping experience memory as pickle...")
-        dispatch_policy.dump_experience_memory()
+        dispatch_policy.dump_experience_memory(NUM_SIMULATION_STEPS)

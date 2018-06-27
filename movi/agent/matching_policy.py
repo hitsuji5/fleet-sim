@@ -6,8 +6,11 @@ class MatchingPolicy(object):
         return []
 
     def find_available_vehicles(self, vehicles):
-        idle_vehicles = vehicles[(vehicles.status == vehicle_status_codes.IDLE) |
-                                 (vehicles.status == vehicle_status_codes.CRUISING)]
+        idle_vehicles = vehicles[
+            ((vehicles.status == vehicle_status_codes.IDLE) |
+            (vehicles.status == vehicle_status_codes.CRUISING)) &
+            (vehicles.idle_duration > 0)
+        ]
         return idle_vehicles
 
     def create_command(self, vehicle_id, customer_id):

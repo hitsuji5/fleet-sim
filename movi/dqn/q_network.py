@@ -4,13 +4,13 @@ import tensorflow as tf
 # from tensorflow.python.keras import backend as K
 from tensorflow.python.keras.models import Model
 from tensorflow.python.keras.layers import Input, Flatten, Dense, Activation,\
-    concatenate, Conv2D, GlobalAveragePooling2D, BatchNormalization
+    concatenate, Conv2D, concatenate, GlobalAveragePooling2D, BatchNormalization
 from . import settings
 
 
 class DeepQNetwork(object):
     def __init__(self, load_network=False):
-        self.main_input, self.q_values, self.model = self.build_q_network()
+        self.main_input, self.sub_input, self.q_values, self.model = self.build_q_network()
 
         if not os.path.exists(settings.SAVE_NETWORK_PATH):
             os.makedirs(settings.SAVE_NETWORK_PATH)
@@ -22,15 +22,19 @@ class DeepQNetwork(object):
             self.load_network()
 
     def build_q_network(self):
-        main_input = Input(shape=settings.INPUT_SHAPE, dtype='float32')
-        x = Conv2D(16, (3, 3), activation='relu', name='conv_1')(main_input)
-        x = Conv2D(4, (3, 3), activation='relu', name='conv_2')(x)
-        x = Conv2D(4, (5, 5), activation='relu', name='conv_3')(x)
-        x = Conv2D(1, (5, 5), name='main/q_value')(x)
-        q_values = Flatten()(x)
-        model = Model(inputs=main_input, outputs=q_values)
+        main_input = Input(shape=settings.MAIN_INPUT_SHAPE, dtype='float32')
+        sub_input = Input(shape=settings.SUB_INPUT_SHAPE, dtype='float32')
+        x = Conv2D(32, (3, 3), activation='relu', name='conv_1')(main_input)
+        x = Conv2D(32, (3, 3), activation='relu', name='conv_2')(x)
+        x = Conv2D(32, (3, 3), activation='relu', name='conv_3')(x)
 
-        return main_input, q_values, model
+        x = concatenate([x, sub_input], axis=-1)
+        x = Conv2D(64, (1, 1), activation='relu', name='conv_4')(x)
+        x = Conv2D(1, (1, 1), name='q_value')(x)
+        q_values = Flatten()(x)
+        model = Model(inputs=[main_input, sub_input], outputs=q_values)
+
+        return main_input, sub_input, q_values, model
 
 
     def load_network(self):
@@ -43,27 +47,39 @@ class DeepQNetwork(object):
 
 
     def compute_q_values(self, s):
-        return self.q_values.eval(
+        sd, tt = s
+        q = self.q_values.eval(
             feed_dict={
-                self.main_input: np.array([s], dtype=np.float32).transpose((0, 3, 2, 1)),
+                self.main_input: self.map2input([sd]),
+                self.sub_input: self.map2input([tt]),
                 # self.local_input: np.array(local_features, dtype=np.float32)
                 # K.learning_phase(): 0
             })[0]
+        q[tt[0].flatten() > 1.0] = -float('inf')
+        return q
 
-    def get_action(self, s, tt_map):
+    def get_action(self, s):
         q_values = self.compute_q_values(s)
-        q_values[tt_map.flatten() > 1.0] = -float('inf')
+        if settings.SQL:
+            return self.arg_softmax(q_values)
         return np.argmax(q_values)
 
+    def arg_softmax(self, q_values):
+        exp_q = np.exp(q_values - q_values.max())
+        p = exp_q / exp_q.sum()
+        return np.random.choice(len(q_values), p=p)
+
+    def map2input(self, f):
+        return np.array(f, dtype=np.float32).transpose((0, 2, 3, 1))
 
 class FittingDeepQNetwork(DeepQNetwork):
 
     def __init__(self, load_network=False):
-        super(FittingDeepQNetwork, self).__init__(load_network=False)
+        super().__init__(load_network=load_network)
 
         model_weights = self.model.trainable_weights
         # Create target network
-        self.target_main_input, self.target_q_values, self.target_model = self.build_q_network()
+        self.target_main_input, self.target_sub_input, self.target_q_values, self.target_model = self.build_q_network()
         target_model_weights = self.target_model.trainable_weights
 
         # Define target network update operation
@@ -90,15 +106,16 @@ class FittingDeepQNetwork(DeepQNetwork):
         self.summary_writer = tf.summary.FileWriter(settings.SAVE_SUMMARY_PATH, self.sess.graph)
 
 
-    def get_action(self, s, tt_map):
+    def get_action(self, s):
         # e-greedy exploration
         if self.epsilon > np.random.random():
             if settings.WAIT_ACTION_PROBABILITY > np.random.random():
                 return settings.WAIT_ACTION
-            actions = np.arange((settings.MAX_MOVE * 2 + 1) ** 2)[tt_map.flatten() <= 1.0]
+            _, tt_map = s
+            actions = np.arange(settings.NUM_ACTIONS)[tt_map[0].flatten() <= 1.0]
             return np.random.choice(actions)
         else:
-            return super(FittingDeepQNetwork, self).get_action(s, tt_map)
+            return super().get_action(s)
 
 
 
@@ -106,16 +123,35 @@ class FittingDeepQNetwork(DeepQNetwork):
         return self.n_steps, self.epsilon
 
     def compute_target_q_values(self, s):
-        return self.target_q_values.eval(
+        sd, tt = s
+        q = self.target_q_values.eval(
             feed_dict={
-                self.target_main_input: np.array([s], dtype=np.float32).transpose((0, 3, 2, 1)),
-                # self.target_local_input: np.array(local_features, dtype=np.float32)
+                self.target_main_input: self.map2input([sd]),
+                self.target_sub_input: self.map2input([tt]),
+                # self.local_input: np.array(local_features, dtype=np.float32)
                 # K.learning_phase(): 0
             })[0]
+        q[tt[0].flatten() > 1.0] = -float('inf')
+        return q
+
+    def compute_target_value(self, s):
+        target_q_values = self.compute_target_q_values(s)
+        if settings.SQL:
+            return self.softmax(target_q_values)
+        a = np.argmax(self.compute_q_values(s))
+        return target_q_values[a]
+
+    def softmax(self, q_values):
+        q_max = q_values.max()
+        V = settings.ALPHA * np.log(np.exp((q_values - q_max) / settings.ALPHA).sum()) + q_max
+        return V
+
 
     def fit(self, s_batch, a_batch, y_batch):
+        sd, tt = zip(*s_batch)
         loss, _ = self.sess.run([self.loss, self.grad_update], feed_dict={
-            self.main_input: np.array(s_batch, dtype=np.float32).transpose((0, 3, 2, 1)),
+            self.main_input: self.map2input(sd),
+            self.sub_input: self.map2input(tt),
             self.a: np.array(a_batch, dtype=np.float32),
             # self.local_input: np.array(local_batch, dtype=np.float32),
             # K.learning_phase(): 1,
@@ -132,7 +168,7 @@ class FittingDeepQNetwork(DeepQNetwork):
 
         # Save network
         if self.n_steps % settings.SAVE_INTERVAL == 0:
-            save_path = self.saver.save(self.sess, settings.SAVE_NETWORK_PATH, global_step=(self.n_steps))
+            save_path = self.saver.save(self.sess, os.path.join(settings.SAVE_NETWORK_PATH, "model"), global_step=(self.n_steps))
             print('Successfully saved: ' + save_path)
 
         # Anneal epsilon linearly over time
@@ -145,9 +181,8 @@ class FittingDeepQNetwork(DeepQNetwork):
         y = tf.placeholder(tf.float32, shape=(None))
 
         # Convert action to one hot vector
-        a_one_hot = tf.one_hot(a, (settings.MAX_MOVE * 2 + 1) ** 2, 1.0, 0.0)
+        a_one_hot = tf.one_hot(a, settings.NUM_ACTIONS, 1.0, 0.0)
         q_value = tf.reduce_sum(tf.multiply(self.q_values, a_one_hot), reduction_indices=1)
-        # q_value = tf.reduce_sum(self.q_values, reduction_indices=1)
         loss = tf.losses.huber_loss(y, q_value)
         optimizer = tf.train.RMSPropOptimizer(settings.LEARNING_RATE, momentum=settings.MOMENTUM, epsilon=settings.MIN_GRAD)
         grad_update = optimizer.minimize(loss, var_list=q_network_weights)

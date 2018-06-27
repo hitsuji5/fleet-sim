@@ -3,6 +3,7 @@ from simulator.simulator import Simulator
 from agent.agent import Agent
 from common import vehicle_status_codes, mesh
 from config.settings import MAP_WIDTH, MAP_HEIGHT
+from logger import sim_logger
 
 class Experiment(object):
 
@@ -10,37 +11,37 @@ class Experiment(object):
         self.simulator = Simulator(start_time, timestep, use_pattern)
         self.agent = Agent(dispatch_policy, matching_policy)
 
+    def reset(self, start_time=None, timestep=None):
+        self.simulator.log_score()
+        self.simulator.reset(start_time, timestep)
 
-    def init_vehicles(self, n_vehicles, n_steps=10):
+    def populate_vehicles(self, n_vehicles):
         vehicle_ids = range(1, n_vehicles + 1)
-        N = int(n_vehicles / n_steps)
-        locations = [mesh.convert_xy_to_lonlat(x ,y)[::-1] for x in range(MAP_WIDTH) for y in range(MAP_HEIGHT)]
-        for i in range(n_steps):
-            vehicle_locations = [locations[np.random.randint(0, len(locations))] for _ in range(N)]
-            self.simulator.populate_vehicles(vehicle_ids[i * N : (i + 1) * N], vehicle_locations)
-            self.simulator.step()
-            requests = self.simulator.get_new_requests()
-            vehicles = self.simulator.get_vehicles_state()
-            current_time = self.simulator.get_current_time()
-            m_commands, d_commands = self.agent.get_commands(current_time, vehicles, requests)
-            self.simulator.match_vehicles(m_commands)
-            self.simulator.dispatch_vehicles(d_commands)
+        locations = [mesh.convert_xy_to_lonlat(x, y)[::-1] for x in range(MAP_WIDTH) for y in range(MAP_HEIGHT)]
+        p = self.agent.dispatch_policy.demand_predictor.predict(self.simulator.get_current_time())[0]
+        p = p.flatten() / p.sum()
+        vehicle_locations = [locations[i] for i in np.random.choice(len(locations), size=n_vehicles, p=p)]
+        self.simulator.populate_vehicles(vehicle_ids, vehicle_locations)
+
 
     def step(self, verbose=False):
         self.simulator.step()
         vehicles = self.simulator.get_vehicles_state()
         requests = self.simulator.get_new_requests()
         current_time = self.simulator.get_current_time()
-        # commands = self.agent.get_commands(current_time, vehicles, requests)
-        # self.simulator.dispatch_vehicles(commands)
         m_commands, d_commands = self.agent.get_commands(current_time, vehicles, requests)
         self.simulator.match_vehicles(m_commands)
         self.simulator.dispatch_vehicles(d_commands)
 
+        net_v = vehicles[vehicles.status != vehicle_status_codes.OFF_DUTY]
+        summary = "{:d}, {:d}, {:d}, {:d}, {:d}, {:d}".format(
+            current_time, len(net_v), len(net_v[net_v.status == vehicle_status_codes.OCCUPIED]),
+            len(requests), len(m_commands), len(d_commands)
+        )
+        sim_logger.log_summary(summary)
+
         if verbose:
-            print("t={:d}, n_vehicles={:d}, n_requests={:d}, matching={:d}, dispatch={:d}".format(
-                current_time, len(vehicles[vehicles.status != vehicle_status_codes.OFF_DUTY]),
-                len(requests), len(m_commands), len(d_commands)))
+            print(summary)
 
     def dry_run(self, n_steps):
         for _ in range(n_steps):

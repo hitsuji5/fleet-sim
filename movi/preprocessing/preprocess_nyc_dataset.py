@@ -13,31 +13,23 @@ def load_trip_data(path, cols, new_cols):
     return df
 
 def convert_datetime(df):
-    # df['pickup_datetime'] = pd.to_datetime(pd.Series(df.pickup_datetime))
     df['request_datetime'] = pd.to_datetime(df.pickup_datetime).apply(lambda x: int(get_local_unixtime(x)))
     df['trip_time'] = pd.to_datetime(df.dropoff_datetime).apply(lambda x: int(get_local_unixtime(x))) - df.request_datetime
-    # df['trip_time'] = df.trip_time.map(lambda x: x/np.timedelta64(1, 's'))
-    # dates = pd.DatetimeIndex(df.pickup_datetime)
-    # df['date'] = dates.day
-    # df['hour'] = dates.hour
-    # df['minute'] = dates.minute
-    # df['dayofweek'] = df.pickup_datetime.dt.dayofweek
-    # year = dates.year[0]
-    # month = dates.month[0]
-    # df['second'] = df.pickup_datetime - datetime.datetime(year,month,1)
-    # df['second'] = df.second.map(lambda x: x/np.timedelta64(1, 's'))
     df = df.drop(['pickup_datetime', 'dropoff_datetime'], axis=1)
     return df
 
 
 def remove_outliers(df):
     df['distance'] = great_circle_distance(df.origin_lat, df.origin_lon, df.destination_lat, df.destination_lon).astype(int)
-    df['speed'] = df.distance / df.trip_time / 1000 * 3600
+    df['speed'] = df.distance / df.trip_time / 1000 * 3600 # km/h
+    df['rpm'] = df.fare / df.trip_time * 60 # $/m
 
     df = df[(df.trip_time > 60) & (df.trip_time < 3600 * 2)]
     df = df[(df.distance > 100) & (df.distance < 100000)]
-    df = df[(df.speed > 2) & (df.speed < 100)]
-    return df.drop(['distance', 'speed'], axis=1)
+    df = df[(df.speed > 2) & (df.speed < 80)]
+    # df = df[df.fare < 52]
+
+    return df.drop(['distance', 'speed', 'rpm'], axis=1)
 
 def extract_bounding_box(df, bounding_box):
     min_lat, min_lon = bounding_box[0]

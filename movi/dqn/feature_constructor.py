@@ -13,7 +13,7 @@ class FeatureConstructor(object):
     def update_time(self, current_time):
         self.t = current_time
 
-    def update_supply(self, vehicles, duration=1800):
+    def update_supply(self, vehicles, duration=900):
         idle = vehicles[vehicles.status == vehicle_status_codes.IDLE]
         cruise = vehicles[vehicles.status == vehicle_status_codes.CRUISING]
         occupied = vehicles[vehicles.status == vehicle_status_codes.OCCUPIED]
@@ -27,19 +27,28 @@ class FeatureConstructor(object):
         self.supply_maps = [stopped_vehicle_map, cruise_origin_map, cruise_destination_map, dropoff_map, average_map]
 
 
-    def update_demand(self, demand):
-        self.demand_maps = demand
-        averaged_demand_map = self.compute_spatial_average(self.demand_maps[-1])
-        self.demand_maps.append(averaged_demand_map)
+    def update_demand(self, demand, normalized_factor=0.1):
+        self.demand_maps = [d * normalized_factor for d in demand]
+        averaged_dmap = self.compute_spatial_average(self.demand_maps[-1])
+        averaged_dmap2 = self.compute_spatial_average(averaged_dmap)
+
+        self.demand_maps += [averaged_dmap, averaged_dmap2]
 
 
-    def compute_spatial_average(self, map, radius=10):
+    def compute_spatial_average(self, map, radius=MAX_MOVE):
         padded_map = np.pad(map, radius, "constant")
         averaged_map = sum([padded_map[x + radius : x + radius + MAP_WIDTH, y + radius : y + radius + MAP_HEIGHT]
                         * np.exp(-(x ** 2  + y ** 2) / (radius / 2.0) ** 2)
                             for x in range(-radius, radius + 1)
                             for y in range(-radius, radius + 1)
                             if x ** 2 + y ** 2 <= radius ** 2]) / ((radius / 2.0) ** 2 * np.pi)
+
+        # smap = self.construct_initial_map()
+        # for x in range(MAP_WIDTH):
+        #     for y in range(MAP_HEIGHT):
+        #         p = np.exp(-self.get_triptime_map(x, y))
+        #         smap[x, y] = (p / p.sum() * self.extract_box(map, x, y, MAX_MOVE * 2 + 1)).sum()
+
         return averaged_map
 
     def update_fingerprint(self, fingerprint):
@@ -51,25 +60,29 @@ class FeatureConstructor(object):
 
     def construct_feature_maps(self, maps, location):
         x, y = location
-        # x, y = mesh.convert_lonlat_to_xy(lon, lat)
         features = [self.extract_box(m, x, y, FEATURE_MAP_SIZE) for m in maps]
         point_map = self.construct_initial_map(w=FEATURE_MAP_SIZE, h=FEATURE_MAP_SIZE)
         center = int((FEATURE_MAP_SIZE - 1) / 2)
         point_map[center, center] = 1.0
         features += [point_map]
-        # features += [self.get_triptime_map(x, y)]
-        return features
+        tt_map = [self.get_triptime_map(x, y)]
+        return features, tt_map
 
     def get_triptime_map(self, x, y):
         size = MAX_MOVE * 2 + 1
         tt = self.construct_initial_map(w=size, h=size)
-        for x_ in range(-MAX_MOVE, MAX_MOVE + 1):
-            for y_ in range(-MAX_MOVE, MAX_MOVE + 1):
-                if x + x_ < MAP_WIDTH and y + y_ < MAP_HEIGHT and x + x_ >= 0 and y + y_ >= 0:
-                    tt[MAX_MOVE + x_, MAX_MOVE + y_] = np.sqrt(x_ ** 2 + y_ ** 2) / (MAX_MOVE + 1)
+        for ax in range(-MAX_MOVE, MAX_MOVE + 1):
+            for ay in range(-MAX_MOVE, MAX_MOVE + 1):
+                x_ = x + ax
+                y_ = y + ay
+                if x_ < MAP_WIDTH and y_ < MAP_HEIGHT and x_ >= 0 and y_ >= 0:
+                    tt[MAX_MOVE + ax, MAX_MOVE + ay] = self.get_triptime(x, y, x_, y_) / (MAX_MOVE + 1)
                 else:
-                    tt[MAX_MOVE + x_, MAX_MOVE + y_] = 2.0
+                    tt[MAX_MOVE + ax, MAX_MOVE + ay] = 2.0
         return tt
+
+    def get_triptime(self, sx, sy, tx, ty):
+        return np.sqrt((sx - tx) ** 2 + (sy - ty) ** 2)
 
 
     def get_supply_demand_maps(self):

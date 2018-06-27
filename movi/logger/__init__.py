@@ -13,7 +13,8 @@ class SimulationLogger(object):
         self.env = None
         self.vehicle_logger = getLogger('vehicle')
         self.customer_logger = getLogger('customer')
-        self.command_logger = getLogger('command')
+        self.summary_logger = getLogger('summary')
+        self.score_logger = getLogger('score')
 
     def setup_logging(self, path, level):
         with open(path, 'rt') as f:
@@ -28,15 +29,19 @@ class SimulationLogger(object):
             return self.env.get_current_time()
         return 0
 
-    def log_vehicle_event(self, event, state):
+    def log_vehicle_event(self, msg):
         t = self.get_current_time()
-        self.vehicle_logger.info('{},{},{}'.format(str(t), event, state))
+        self.vehicle_logger.info('{},{}'.format(str(t), msg))
 
-    def log_customer_event(self, event, state):
+    def log_customer_event(self, msg):
         t = self.get_current_time()
-        self.customer_logger.info('{},{},{}'.format(str(t), event, state))
+        self.customer_logger.info('{},{}'.format(str(t), msg))
 
-    # def log_command(self, event, vehicle_id):
-    #     pass
+    def log_summary(self, summary):
+        self.summary_logger.info(summary)
+
+    def log_score(self, score):
+        self.score_logger.info(score)
+
 
 sim_logger = SimulationLogger(path)

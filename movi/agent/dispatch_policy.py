@@ -1,11 +1,10 @@
 from common import vehicle_status_codes
 from .services.demand_prediction_service import DemandPredictionService
-from config.settings import DEMAND_AMPLIFICATION_FACTOR
-
+from config.settings import DEMAND_AMPLIFICATION_FACTOR, NUM_VEHICLES, TIMESTEP, MIN_UPDATE_CYCLE
+import numpy as np
 
 class DispatchPolicy(object):
-    def __init__(self, min_update_cycle=300):
-        self.min_update_cycle = min_update_cycle # seconds
+    def __init__(self):
         self.demand_predictor = DemandPredictionService(amplification_factor=DEMAND_AMPLIFICATION_FACTOR)
         self.updated_at = {}
 
@@ -31,15 +30,18 @@ class DispatchPolicy(object):
         cruising_vehicles = vehicles[vehicles.status == vehicle_status_codes.CRUISING]
         tbd_idle_vehicles = idle_vehicles.loc[[
             vehicle_id for vehicle_id in idle_vehicles.index
-            if current_time - self.updated_at.get(vehicle_id, 0) >= self.min_update_cycle / 2
+            if current_time - self.updated_at.get(vehicle_id, 0) >= MIN_UPDATE_CYCLE
         ]]
         tbd_cruising_vehicles = cruising_vehicles.loc[[
             vehicle_id for vehicle_id in cruising_vehicles.index
-            if current_time - self.updated_at.get(vehicle_id, 0) >= self.min_update_cycle
+            if current_time - self.updated_at.get(vehicle_id, 0) >= MIN_UPDATE_CYCLE * 2
         ]]
 
         tbd_vehicles = tbd_idle_vehicles.append(tbd_cruising_vehicles)
-
+        max_n = int(NUM_VEHICLES / MIN_UPDATE_CYCLE * TIMESTEP)
+        if len(tbd_vehicles) > max_n:
+            p = np.random.permutation(len(tbd_vehicles))
+            tbd_vehicles = tbd_vehicles.iloc[p[:max_n]]
         return tbd_vehicles
 
     def record_updated_at(self, vehicle_ids, current_time):

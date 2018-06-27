@@ -14,7 +14,7 @@ class RoutingService(object):
                           ((origin_lat + dest_lat) / 2, (origin_lat + dest_lon) / 2),
                           (dest_lat, dest_lon)]
             distance = great_circle_distance(origin_lat, origin_lon, dest_lat, dest_lon)
-            triptime = distance / 5.0
+            triptime = distance / 8.0
             results.append((trajectory, distance, triptime))
         return results
 

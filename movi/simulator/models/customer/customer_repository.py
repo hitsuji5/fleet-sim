@@ -20,6 +20,7 @@ class CustomerRepository(object):
     @classmethod
     def init(cls):
         cls.customers = {}
+        cls.new_customers = []
 
     @classmethod
     def update_customers(cls, customers):

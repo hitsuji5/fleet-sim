@@ -11,6 +11,8 @@ class Customer(object):
     def step(self, timestep):
         if self.status == customer_status_codes.WAITING:
             self.waiting_time += timestep
+        elif self.status == customer_status_codes.CALLING:
+            self.disappear()
 
     def get_id(self):
         customer_id = self.request.id
@@ -36,18 +38,24 @@ class Customer(object):
 
     def ride_on(self):
         self.status = customer_status_codes.IN_VEHICLE
-        sim_logger.log_customer_event("ride_on", self.to_msg())
+        self.__log()
 
     def get_off(self):
         self.status = customer_status_codes.ARRIVED
-        sim_logger.log_customer_event("get_off", self.to_msg())
 
-    def is_arrived_or_rejected(self):
-        return self.status == customer_status_codes.ARRIVED or self.status == customer_status_codes.CALLING
+    def disappear(self):
+        self.status = customer_status_codes.DISAPPEARED
+        self.__log()
+
+    def is_arrived(self):
+        return self.status == customer_status_codes.ARRIVED
+
+    def is_disappeared(self):
+        return self.status == customer_status_codes.DISAPPEARED
 
     def make_payment(self):
         return self.request.fare
 
-    def to_msg(self):
-        state = list(self.request) + [self.status, self.waiting_time]
-        return ','.join(map(str, state))
+    def __log(self):
+        msg = ','.join(map(str, [self.request.id, self.status, self.waiting_time]))
+        sim_logger.log_customer_event(msg)

@@ -42,15 +42,23 @@ handlers:
         backupCount: 20
         encoding: utf8
 
-    command_file_handler:
+    summary_file_handler:
         class: logging.handlers.RotatingFileHandler
         level: INFO
         formatter: raw
-        filename: ../data/logs/command.log
+        filename: ../data/logs/summary.log
         maxBytes: 10485760 # 10MB
         backupCount: 20
         encoding: utf8
 
+    score_file_handler:
+        class: logging.handlers.RotatingFileHandler
+        level: INFO
+        formatter: raw
+        filename: ../data/logs/score.log
+        maxBytes: 10485760 # 10MB
+        backupCount: 20
+        encoding: utf8
 
 loggers:
     vehicle:
@@ -63,11 +71,15 @@ loggers:
         handlers: [customer_file_handler]
         propagate: no
 
-    command:
+    summary:
         level: INFO
-        handlers: [command_file_handler]
+        handlers: [summary_file_handler]
         propagate: no
 
+    score:
+        level: INFO
+        handlers: [score_file_handler]
+        propagate: no
 
 root:
     level: INFO
