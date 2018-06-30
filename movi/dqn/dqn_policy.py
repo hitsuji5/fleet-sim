@@ -15,8 +15,6 @@ class DQNDispatchPolicy(DispatchPolicy):
         super().__init__()
         self.feature_constructor = FeatureConstructor()
         self.q_network = None
-        R = settings.MAX_MOVE
-        self.action_space = [(x, y) for x in range(-R, R + 1) for y in range(-R, R + 1)]
 
 
     def build_q_network(self, load_network=False):
@@ -33,24 +31,26 @@ class DQNDispatchPolicy(DispatchPolicy):
     def get_commands(self, tbd_vehicles):
         commands = []
         for vehicle_id, vehicle_state in tbd_vehicles.iterrows():
-            a = self.predict_best_action(vehicle_id, vehicle_state)
-            target = self.convert_action_to_destination(vehicle_state, a)
-            if target is None:
-                continue
-            command = self.create_command(vehicle_id, target)
+            ax, ay, offduty = self.predict_best_action(vehicle_id, vehicle_state)
+            if offduty:
+                command = self.create_command(vehicle_id, None, offduty=True)
+            else:
+                target = self.convert_action_to_destination(vehicle_state, ax, ay)
+                if target is None:
+                    continue
+                command = self.create_command(vehicle_id, target)
             commands.append(command)
         return commands
 
     def predict_best_action(self, vehicle_id, vehicle_state):
         x, y = mesh.convert_lonlat_to_xy(vehicle_state.lon, vehicle_state.lat)
-        s = self.feature_constructor.construct_features(x, y)
+        s, actions = self.feature_constructor.construct_current_features(x, y)
         if self.q_network is None:
             return settings.WAIT_ACTION
         else:
-            return self.q_network.get_action(s)
+            return actions[self.q_network.get_action(s)]
 
-    def convert_action_to_destination(self, vehicle_state, a):
-        ax, ay = self.action_space[a]
+    def convert_action_to_destination(self, vehicle_state, ax, ay):
         x, y = mesh.convert_lonlat_to_xy(vehicle_state.lon, vehicle_state.lat)
         lon, lat = mesh.convert_xy_to_lonlat(x + ax, y + ay)
         if lon == vehicle_state.lon and lat == vehicle_state.lat:
@@ -165,16 +165,14 @@ class DQNDispatchPolicyLearner(DQNDispatchPolicy):
         q_max_sum = 0
         for _ in range(n_iterations):
             s_batch = []
-            a_batch = []
             y_batch = []
             for _ in range(batch_size):
-                s, a, y = self.replay_memory()
+                s, y = self.replay_memory()
                 s_batch.append(s)
-                a_batch.append(a)
                 y_batch.append(y)
 
             # print(np.percentile(y_batch, [5, 25, 50, 75, 95]))
-            loss_sum += self.q_network.fit(s_batch, a_batch, y_batch)
+            loss_sum += self.q_network.fit(s_batch, y_batch)
             q_max_sum += np.mean(y_batch)
         self.q_network.run_cyclic_updates()
         return loss_sum / n_iterations, q_max_sum / n_iterations
@@ -190,16 +188,13 @@ class DQNDispatchPolicyLearner(DQNDispatchPolicy):
                 self.experience_memory.pop(num)
                 continue
 
-            s = self.feature_constructor.construct_feature_maps(self.supply_demand_history[t], loc)
-            next_s = self.feature_constructor.construct_feature_maps(self.supply_demand_history[next_t], next_loc)
+            s_map, s_f = self.feature_constructor.construct_state_feature(self.supply_demand_history[t], loc)
+            a_map, a_f = self.feature_constructor.construct_action_feature(loc, a)
+            s = (s_map + a_map, s_f + a_f)
+            next_s = self.feature_constructor.construct_features(self.supply_demand_history[next_t], next_loc)
             target_value = self.q_network.compute_target_value(next_s)
-
-            # next_supply_demand_map = self.supply_demand_history[next_t]
-            # next_s = self.feature_constructor.construct_feature_maps(next_supply_demand_map, next_loc)
-            # target_q_values = self.q_network.compute_target_q_values(next_s)
-            # next_a = np.argmax(self.q_network.compute_q_values(next_s))
             discount_factor = settings.GAMMA ** int((next_t - t) / 60)
             y = reward + discount_factor * target_value
-            return s, a, y
+            return s, y
 
         raise Exception

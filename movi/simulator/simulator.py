@@ -39,8 +39,8 @@ class Simulator(object):
 
         for vehicle in VehicleRepository.get_all():
             vehicle.step(self.__dt)
-            if vehicle.get_idle_duration() >= IDLE_DURATION_LIMIT and np.random.random() < REST_PROBABILITY:
-                vehicle.take_rest(np.random.randint(REST_DURATION))
+            # if vehicle.get_idle_duration() >= IDLE_DURATION_LIMIT and np.random.random() < REST_PROBABILITY:
+            #     vehicle.take_rest(np.random.randint(REST_DURATION))
 
         self.__populate_new_customers()
         self.__update_time()
@@ -78,8 +78,12 @@ class Simulator(object):
             if vehicle is None:
                 self.logger.warning("Invalid Vehicle id")
                 continue
-            vehicles.append(vehicle)
-            od_pairs.append((vehicle.get_location(), command["destination"]))
+
+            if "offduty" in command:
+                vehicle.take_rest(REST_DURATION)
+            else:
+                vehicles.append(vehicle)
+                od_pairs.append((vehicle.get_location(), command["destination"]))
         routes = self.routing_service.route(od_pairs)
 
         for vehicle, (route, distance, triptime) in zip(vehicles, routes):

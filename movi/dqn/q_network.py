@@ -22,19 +22,20 @@ class DeepQNetwork(object):
             self.load_network()
 
     def build_q_network(self):
-        main_input = Input(shape=settings.MAIN_INPUT_SHAPE, dtype='float32')
-        sub_input = Input(shape=settings.SUB_INPUT_SHAPE, dtype='float32')
-        x = Conv2D(32, (3, 3), activation='relu', name='conv_1')(main_input)
+        map_input = Input(shape=settings.MAIN_INPUT_SHAPE, dtype='float32')
+        feature_input = Input(shape=settings.SUB_INPUT_SHAPE, dtype='float32')
+        x = Conv2D(32, (5, 5), activation='relu', name='conv_1')(map_input)
         x = Conv2D(32, (3, 3), activation='relu', name='conv_2')(x)
-        x = Conv2D(32, (3, 3), activation='relu', name='conv_3')(x)
+        x = GlobalAveragePooling2D()(x)
+        map_output = Flatten()(x)
 
-        x = concatenate([x, sub_input], axis=-1)
-        x = Conv2D(64, (1, 1), activation='relu', name='conv_4')(x)
-        x = Conv2D(1, (1, 1), name='q_value')(x)
-        q_values = Flatten()(x)
-        model = Model(inputs=[main_input, sub_input], outputs=q_values)
+        x = concatenate([map_output, feature_input], axis=-1)
+        x = Dense(64, activation='relu', name='dense_1')(x)
+        x = Dense(64, activation='relu', name='dense_2')(x)
+        q_value = Dense(1, activation='relu', name='q_value')(x)
+        model = Model(inputs=[map_input, feature_input], outputs=q_value)
 
-        return main_input, sub_input, q_values, model
+        return map_input, feature_input, q_value, model
 
 
     def load_network(self):
@@ -47,15 +48,14 @@ class DeepQNetwork(object):
 
 
     def compute_q_values(self, s):
-        sd, tt = s
+        s_map, s_feature, a_maps, a_features = s
         q = self.q_values.eval(
             feed_dict={
-                self.main_input: self.map2input([sd]),
-                self.sub_input: self.map2input([tt]),
+                self.main_input: self.map2input([s_map + a_map for a_map in a_maps]),
+                self.sub_input: np.array([s_feature + a_feature for a_feature in a_features], dtype=np.float32),
                 # self.local_input: np.array(local_features, dtype=np.float32)
                 # K.learning_phase(): 0
-            })[0]
-        q[tt[0].flatten() > 1.0] = -float('inf')
+            })
         return q
 
     def get_action(self, s):
@@ -123,15 +123,14 @@ class FittingDeepQNetwork(DeepQNetwork):
         return self.n_steps, self.epsilon
 
     def compute_target_q_values(self, s):
-        sd, tt = s
+        s_map, s_feature, a_maps, a_features = s
         q = self.target_q_values.eval(
             feed_dict={
-                self.target_main_input: self.map2input([sd]),
-                self.target_sub_input: self.map2input([tt]),
+                self.target_main_input: self.map2input([s_map + a_map for a_map in a_maps]),
+                self.target_sub_input: np.array([s_feature + a_feature for a_feature in a_features], dtype=np.float32),
                 # self.local_input: np.array(local_features, dtype=np.float32)
                 # K.learning_phase(): 0
-            })[0]
-        q[tt[0].flatten() > 1.0] = -float('inf')
+            })
         return q
 
     def compute_target_value(self, s):
@@ -147,12 +146,11 @@ class FittingDeepQNetwork(DeepQNetwork):
         return V
 
 
-    def fit(self, s_batch, a_batch, y_batch):
-        sd, tt = zip(*s_batch)
+    def fit(self, s_batch, y_batch):
+        map_input, feature_input = zip(*s_batch)
         loss, _ = self.sess.run([self.loss, self.grad_update], feed_dict={
-            self.main_input: self.map2input(sd),
-            self.sub_input: self.map2input(tt),
-            self.a: np.array(a_batch, dtype=np.float32),
+            self.main_input: self.map2input(map_input),
+            self.sub_input: self.map2input(feature_input),
             # self.local_input: np.array(local_batch, dtype=np.float32),
             # K.learning_phase(): 1,
             self.y: np.array(y_batch, dtype=np.float32)

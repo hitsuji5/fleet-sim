@@ -48,8 +48,10 @@ class DispatchPolicy(object):
         for vehicle_id in vehicle_ids:
             self.updated_at[vehicle_id] = current_time
 
-    def create_command(self, vehicle_id, destination):
+    def create_command(self, vehicle_id, destination, offduty=False):
         command = {}
         command["vehicle_id"] = vehicle_id
         command["destination"] = destination
+        if offduty:
+            command["offduty"] = True
         return command

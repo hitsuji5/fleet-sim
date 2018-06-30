@@ -54,32 +54,71 @@ class FeatureConstructor(object):
     def update_fingerprint(self, fingerprint):
         self.fingerprint = fingerprint
 
-    def construct_features(self, x, y):
-        features = self.construct_feature_maps(self.get_supply_demand_maps(), (x, y))
-        return features
+    def construct_current_features(self, x, y):
+        s, actions = self.construct_features(self.get_supply_demand_maps(), (x, y))
+        return s, actions
+        # state_map, state_feature = self.construct_state_feature(self.get_supply_demand_maps(), (x, y))
+        # actions, action_maps, action_features = self.construct_action_features((x, y))
+        # return (state_map, state_feature, action_maps, action_features), actions
 
-    def construct_feature_maps(self, maps, location):
+    def construct_features(self, maps, location):
+        state_map, state_feature = self.construct_state_feature(self.get_supply_demand_maps(), location)
+        actions, action_maps, action_features = self.construct_action_features(location)
+        return (state_map, state_feature, action_maps, action_features), actions
+
+    def construct_state_feature(self, maps, location):
         x, y = location
-        features = [self.extract_box(m, x, y, FEATURE_MAP_SIZE) for m in maps]
+        state_map = [self.extract_box(m, x, y, FEATURE_MAP_SIZE) for m in maps]
         point_map = self.construct_initial_map(w=FEATURE_MAP_SIZE, h=FEATURE_MAP_SIZE)
         center = int((FEATURE_MAP_SIZE - 1) / 2)
         point_map[center, center] = 1.0
-        features += [point_map]
-        tt_map = [self.get_triptime_map(x, y)]
-        return features, tt_map
+        state_map += [point_map]
+        x_norm, y_norm = self.normalize_xy(x, y)
+        state_feature = [x_norm, y_norm] + self.construct_time_features(self.t) + self.construct_fingerprint_features(self.fingerprint)
+        return state_map, state_feature
 
-    def get_triptime_map(self, x, y):
-        size = MAX_MOVE * 2 + 1
-        tt = self.construct_initial_map(w=size, h=size)
+    def construct_action_features(self, location):
+        actions = []
+        action_features = []
+        action_maps = []
+
+        rest = 0
         for ax in range(-MAX_MOVE, MAX_MOVE + 1):
             for ay in range(-MAX_MOVE, MAX_MOVE + 1):
-                x_ = x + ax
-                y_ = y + ay
-                if x_ < MAP_WIDTH and y_ < MAP_HEIGHT and x_ >= 0 and y_ >= 0:
-                    tt[MAX_MOVE + ax, MAX_MOVE + ay] = self.get_triptime(x, y, x_, y_) / (MAX_MOVE + 1)
-                else:
-                    tt[MAX_MOVE + ax, MAX_MOVE + ay] = 2.0
-        return tt
+                a = (ax, ay, rest)
+                feature = self.construct_action_feature(location, a)
+                if feature is not None:
+                    action_feature, action_map = feature
+                    actions.append(a)
+                    action_features.append(action_feature)
+                    action_maps.append(action_map)
+
+        # rest action
+        a = (0, 0, 1)
+        action_feature, action_map = self.construct_action_feature(location, a)
+        actions.append(a)
+        action_features.append(action_feature)
+        action_maps.append(action_map)
+
+        return actions, action_maps, action_features
+
+    def construct_action_feature(self, loc, a):
+        x, y = loc
+        c = int((FEATURE_MAP_SIZE - 1) / 2)
+        ax, ay, offduty = a
+        x_ = x + ax
+        y_ = y + ay
+        if x_ < MAP_WIDTH and y_ < MAP_HEIGHT and x_ >= 0 and y_ >= 0:
+            tt = self.get_triptime(x, y, x_, y_) / (MAX_MOVE + 1)
+            if tt <= 1:
+                x_norm, y_norm = self.normalize_xy(x_, y_)
+                action_feature = [x_norm, y_norm, tt, offduty]
+                action_map = self.construct_initial_map(w=FEATURE_MAP_SIZE, h=FEATURE_MAP_SIZE)
+                action_map[c + ax, c + ay] = 1.0
+                return (action_feature, action_map)
+
+        return None
+
 
     def get_triptime(self, sx, sy, tx, ty):
         return np.sqrt((sx - tx) ** 2 + (sy - ty) ** 2)
@@ -127,8 +166,8 @@ class FeatureConstructor(object):
         t = self.t
         return t
 
-    # def normalize_lonlat(self, lon, lat):
-    #     x = (lon - CENTER_LONGITUDE) / LON_WIDTH
-    #     y = (lat - CENTER_LATITUDE) / LAT_WIDTH
-    #     return x, y
+    def normalize_xy(self, x, y):
+        x_norm = float(x - MAP_WIDTH / 2.0) / MAP_WIDTH * 2.0
+        y_norm = float(y - MAP_HEIGHT / 2.0) / MAP_HEIGHT * 2.0
+        return x_norm, y_norm
 
