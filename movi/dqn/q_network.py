@@ -4,7 +4,7 @@ import tensorflow as tf
 # from tensorflow.python.keras import backend as K
 from tensorflow.python.keras.models import Model
 from tensorflow.python.keras.layers import Input, Flatten, Dense, Activation,\
-    concatenate, Conv2D, concatenate, GlobalAveragePooling2D, BatchNormalization
+    Conv2D, concatenate, GlobalAveragePooling2D, BatchNormalization
 from . import settings
 
 
@@ -65,7 +65,7 @@ class DeepQNetwork(object):
         return np.argmax(q_values)
 
     def arg_softmax(self, q_values):
-        exp_q = np.exp(q_values - q_values.max())
+        exp_q = np.exp((q_values - q_values.max()) / settings.ALPHA)
         p = exp_q / exp_q.sum()
         return np.random.choice(len(q_values), p=p)
 

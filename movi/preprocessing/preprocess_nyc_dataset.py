@@ -63,6 +63,7 @@ def create_dataset(gtrip_path, ytrip_path, bounding_box):
     df.sort_values(by='request_datetime', ascending=True, inplace=True)
     df.reset_index(drop=True, inplace=True)
     df = df[saved_cols]
+    df.index.name = "id"
     print("After Cleaning: {} records".format(len(df)))
     return df
 
@@ -77,4 +78,4 @@ if __name__ == '__main__':
     OUTPUT_PATH = '{}/trips_{}.csv'.format(args.data, args.month)
     df = create_dataset(GREEN_PATH, YELLOW_PATH, BOUNDING_BOX)
     print("Saving DataFrame containing {} rows".format(len(df)))
-    df.to_csv(OUTPUT_PATH, index=False)
+    df.to_csv(OUTPUT_PATH)
