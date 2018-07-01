@@ -53,10 +53,11 @@ score_log_cols = [
 
 class LogAnalyzer(object):
 
-    def __init__(self, dir_path=None):
-        if dir_path is None:
-            dir_path = log_dir_path
-        self.log_dir_path = dir_path
+    def __init__(self):
+        pass
+        # if dir_path is None:
+        #     dir_path = log_dir_path
+        # self.log_dir_path = dir_path
 
     def load_log(self, path, cols, max_num, skip_minutes=0):
         df = pd.read_csv(path, names=cols)
@@ -72,17 +73,23 @@ class LogAnalyzer(object):
         df = df[df.t >= START_TIME + skip_minutes * 60]
         return df
 
-    def load_vehicle_log(self, max_num=1, skip_minutes=0):
-        return self.load_log(self.log_dir_path + vehicle_log_file, vehicle_log_cols, max_num, skip_minutes)
+    def load_vehicle_log(self, log_dir_path, max_num=100, skip_minutes=0):
+        return self.load_log(log_dir_path + vehicle_log_file, vehicle_log_cols, max_num, skip_minutes)
 
-    def load_customer_log(self, max_num=1, skip_minutes=0):
-        return self.load_log(self.log_dir_path + customer_log_file, customer_log_cols, max_num, skip_minutes)
+    def load_customer_log(self, log_dir_path, max_num=100, skip_minutes=0):
+        return self.load_log(log_dir_path + customer_log_file, customer_log_cols, max_num, skip_minutes)
 
-    def load_summary_log(self, max_num=1, skip_minutes=0):
-        return self.load_log(self.log_dir_path + summary_log_file, summary_log_cols, max_num, skip_minutes)
+    def load_summary_log(self, log_dir_path, max_num=100, skip_minutes=0):
+        return self.load_log(log_dir_path + summary_log_file, summary_log_cols, max_num, skip_minutes)
 
-    def load_score_log(self, max_num=1, skip_minutes=0):
-        return self.load_log(self.log_dir_path + score_log_file, score_log_cols, max_num, skip_minutes)
+    def load_score_log(self, log_dir_path, max_num=100, skip_minutes=0):
+        df = self.load_log(log_dir_path + score_log_file, score_log_cols, max_num, skip_minutes)
+        df["t"] = (df.t - START_TIME) / 3600
+        df["working"] = df.occupied + df.idle + df.cruising + df.assigned
+        df["occupancy_rate"] = df.occupied / df.working
+        df["cruising_rate"] = (df.cruising + df.assigned) / df.working
+        df["working_rate"] = df.working / (df.working + df.offduty)
+        return df
 
     def get_customer_status(self, customer_df, bin_width=300):
         customer_df["time_bin"] = self.add_time_bin(customer_df, bin_width)
@@ -95,6 +102,7 @@ class LogAnalyzer(object):
     def get_customer_waiting_time(self, customer_df, bin_width=300):
         customer_df["time_bin"] = self.add_time_bin(customer_df, bin_width)
         df = customer_df[customer_df.status == 2].groupby("time_bin").waiting_time.mean()
+        df.index = [time_utils.get_local_datetime(x) for x in df.index]
         return df
 
     def add_time_bin(self, df, bin_width):
