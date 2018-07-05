@@ -45,14 +45,21 @@ if __name__ == '__main__':
 
     matching_policy = RoughMatchingPolicy()
     dqn_exp = Experiment(START_TIME, TIMESTEP, dispatch_policy, matching_policy, use_pattern=args.pattern)
+    dqn_exp.reset()
+    if args.train:
+        dispatch_policy.reset()
+    dqn_exp.populate_vehicles(n_vehicles=NUM_VEHICLES)
+
 
     epoch = 3600 * 24 / TIMESTEP
     for i in range(NUM_SIMULATION_STEPS):
         if i % epoch == 0:
-            dqn_exp.reset()
-            if args.train:
-                dispatch_policy.reset()
-            dqn_exp.populate_vehicles(n_vehicles=NUM_VEHICLES)
+            dqn_exp.simulator.log_score()
+
+        #     dqn_exp.reset()
+        #     if args.train:
+        #         dispatch_policy.reset()
+        #     dqn_exp.populate_vehicles(n_vehicles=NUM_VEHICLES)
 
         if i % int(3600 / TIMESTEP) == 0:
             print("Elapsed : {:.0f} hours".format(i * TIMESTEP / 3600.0))

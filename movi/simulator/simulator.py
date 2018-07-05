@@ -4,7 +4,7 @@ from .services.demand_generation_service import DemandGenerator
 from .services.routing_service import RoutingService
 
 
-from config.settings import IDLE_DURATION_LIMIT, REST_PROBABILITY, REST_DURATION
+from config.settings import REST_DURATION
 import numpy as np
 from logger import sim_logger
 from logging import getLogger

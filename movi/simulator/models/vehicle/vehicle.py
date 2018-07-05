@@ -60,7 +60,7 @@ class Vehicle(object):
         assert self.__behavior.available
         self.__reset_plan()
         self.state.idle_duration = 0
-        self.__set_destination(self.get_location(), duration)
+        self.__set_destination(self.get_location(), np.random.randint(duration / 2, duration * 3 / 2))
         self.__change_to_off_duty()
         self.__log()
 
