@@ -1,3 +1,4 @@
+"""Asynchronous request module"""
 from concurrent import futures
 import itertools
 import urllib.request, urllib.error, urllib.parse
@@ -12,21 +13,30 @@ class AsyncRequest(object):
         else:
             self.n_threads = n_threads
 
-        self.n_batches = int(len(urllist) / self.n_threads)
-        self.urllist = [urllist[i:i+self.n_batches]
-        for i in range(n_threads)]
+        print(len(urllist)/self.n_threads)
 
-        self.executor = futures.ThreadPoolExecutor(max_workers = self.n_threads)
+        if int(len(urllist) / self.n_threads) == 0:
+            self.n_batches = 1
+        else:
+            self.n_batches = int(len(urllist) / self.n_threads)
+
+        self.urllist = [urllist[i:i+self.n_batches]
+                        for i in range(n_threads)]
+
+        self.executor = futures.ThreadPoolExecutor(max_workers=self.n_threads)
 
     def send_async_requests(self):
+        """Sends asynchronous requests"""
         responses = list(self.executor.map(self.get_batch, self.urllist))
         return list(itertools.chain(*responses))
 
     @classmethod
-    def get(self, url):
+    def get(cls, url):
+        """open URL and return JSON contents"""
         with contextlib.closing(urllib.request.urlopen(url)) as conn:
-            result = conn.read()
+            result = conn.read().decode("utf-8")
         return result
 
     def get_batch(self, urllist):
+        """Batch processing for get method; takes list of urls as input"""
         return [self.get(url) for url in urllist]
