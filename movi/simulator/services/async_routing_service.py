@@ -2,14 +2,15 @@
 
 from osrm_router import RouteRequester
 from async_requests import AsyncRequest
+from route import RouteObject
 import json
 
 class AsyncRoutingService(object):
+    """Sends and parses asynchronous requests from list of O-D pairs"""
     def __init__(self):
-        pass
+        self.async_requester = AsyncRequest()
 
-    @classmethod
-    def route(cls, od_pairs):
+    def route(self, od_pairs):
         """Input list of Origin-Destination latlong pairs, return
         tuple of (trajectory latlongs, distance, triptime)"""
         requester = RouteRequester([[0, 0], [1, 1]])
@@ -17,18 +18,19 @@ class AsyncRoutingService(object):
             print(origin, destn)
         async_urllist = [requester.get_routeurl_be(origin, destn) for origin, destn in od_pairs]
 
-        async_requester = AsyncRequest(urllist=async_urllist, n_threads=10)
-        asynclist = async_requester.send_async_requests()
+        self.async_requester.setparams(async_urllist, 10)
+        asyncresponses = self.async_requester.send_async_requests()
 
-        for route, coordpair in zip(asynclist, od_pairs):
-            route_requester = RouteRequester(coordpair)
+        resultlist = []
 
-            routejson = ((json.loads(route))["routes"])[0]
-            parse = route_requester.parse_route([routejson])
+        for response, coordpair in zip(asyncresponses, od_pairs):
+            route = json.loads(response)["routes"]
+            route_object = RouteObject(coordpair, route)
+            parse = route_object.parse_route()
 
             distance = parse[0]
             triptime = parse[1]
             trajectory = parse[2]
-            print(trajectory, distance, triptime)
+            resultlist.append([trajectory, distance, triptime])
 
-        return (trajectory, distance, triptime)
+        return resultlist

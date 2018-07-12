@@ -11,8 +11,8 @@ class RouteObject(object):
     def parse_route(self):
         return [self.length, self.traveltime, self.waypoints]
 
-    def totalRouteLength(self):
+    def total_route_length(self):
         return self.length
 
-    def getLegDetails(self):
+    def get_leg_details(self):
         pass

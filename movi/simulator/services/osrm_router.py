@@ -14,7 +14,7 @@ class RouteRequester(object):
 
         self._generate_route()
 
-    def generateRequestURL_FE(self, prefix="http://localhost:9966"):
+    def generate_url_fe(self, prefix="http://localhost:9966"):
         """Generates URL for a frontend API call from own endpoints"""
         urlholder = """{pfix}/?z=16&center={lat0}%2C{lon0}&loc={lat0}%2C{lon0}&loc={lat1}%2C{lon1}&hl=en&alt=0""".format(
             pfix=prefix,
@@ -25,7 +25,7 @@ class RouteRequester(object):
             )
         return urlholder
 
-    def generateRequestURL_BE(self, prefix="http://localhost:5000"):
+    def generate_url_be(self, prefix="http://localhost:5000"):
         """Generates URL for a backend API call from own endpoints"""
         urlholder = """{pfix}/route/v1/driving/{lat0},{lon0};{lat1},{lon1}?steps=true""".format(
             pfix=prefix,
@@ -42,7 +42,7 @@ class RouteRequester(object):
 
     def _generate_route(self):
         """generates route from own endpoints via RouteObject class"""
-        holder = self.generateRequestURL_BE()
+        holder = self.generate_url_be()
         # self.route = self.route_from_url(holder)
 
         try:
