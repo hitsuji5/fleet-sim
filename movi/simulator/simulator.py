@@ -11,11 +11,11 @@ from logging import getLogger
 
 class Simulator(object):
 
-    def __init__(self, start_time, timestep, use_pattern=False):
+    def __init__(self, start_time, timestep):
         self.reset(start_time, timestep)
-        sim_logger.set_env(self)
+        sim_logger.setup_logging(self)
         self.logger = getLogger(__name__)
-        self.demand_generator = DemandGenerator(use_pattern)
+        self.demand_generator = DemandGenerator()
         self.routing_service = RoutingService()
 
     def reset(self, start_time=None, timestep=None):
@@ -110,5 +110,5 @@ class Simulator(object):
 
     def log_score(self):
         for vehicle in VehicleRepository.get_all():
-            score = ','.join(map(str, [self.get_current_time()] + vehicle.get_score()))
+            score = ','.join(map(str, [self.get_current_time(), vehicle.get_id()] + vehicle.get_score()))
             sim_logger.log_score(score)

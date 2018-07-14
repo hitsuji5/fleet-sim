@@ -1,74 +1,94 @@
 # import sys
-# import os
+import os
 # sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 import argparse
 from experiment import Experiment
 from agent.matching_policy import RoughMatchingPolicy
 from dqn.dqn_policy import DQNDispatchPolicy, DQNDispatchPolicyLearner
-from dqn.settings import BATCH_SIZE, NUM_ITERATIONS, NUM_SUPPLY_DEMAND_HISTORY
-from config.settings import NUM_SIMULATION_STEPS, NUM_VEHICLES, TIMESTEP, START_TIME
+from dqn.settings import BATCH_SIZE, NUM_ITERATIONS, NUM_SUPPLY_DEMAND_HISTORY, FLAGS
+from config.settings import TIMESTEP, DEFAULT_LOG_DIR
 from common.time_utils import get_local_datetime
 
+
+def setup_base_log_dir(base_log_dir):
+    base_log_path = "./logs/{}".format(base_log_dir)
+    if not os.path.exists(base_log_path):
+        os.makedirs(base_log_path)
+    for dirname in ["sim"]:
+        p = os.path.join(base_log_path, dirname)
+        if not os.path.exists(p):
+            os.makedirs(p)
+    if FLAGS.train:
+        for dirname in ["networks", "summary", "memory"]:
+            p = os.path.join(base_log_path, dirname)
+            if not os.path.exists(p):
+                os.makedirs(p)
+
+    if os.path.exists(DEFAULT_LOG_DIR):
+        os.unlink(DEFAULT_LOG_DIR)
+    os.symlink(base_log_dir, DEFAULT_LOG_DIR)
+
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--pattern", action='store_true', help="use request pattern for demand generation")
-    parser.add_argument("--train", action='store_true', help="run training dqn network")
-    parser.add_argument("--load", action='store_true', help="load saved dqn network")
-    parser.add_argument("--verbose", action='store_true', help="print log verbosely")
-    parser.add_argument("--pretrain", type=int, default=0, help="run N pretraining steps using pickled experience memory")
-    args = parser.parse_args()
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument("--pattern", action='store_true', help="use request pattern for demand generation")
+    # parser.add_argument("--train", action='store_true', help="run training dqn network")
+    # parser.add_argument("--load", action='store_true', help="load saved dqn network")
+    # parser.add_argument("--verbose", action='store_true', help="print log verbosely")
+    # parser.add_argument("--pretrain", type=int, default=0, help="run N pretraining steps using pickled experience memory")
+    # parser.add_argument("--logdir", default='./logs/base', help="base log directory")
+    # parser.add_argument("--vehicles", type=int, default=9000, help="number of vehicles")
+    # parser.add_argument("--days", type=int, default=7, help="simulation days")
+    # args = parser.parse_args()
+    setup_base_log_dir(FLAGS.tag)
 
+    num_simulation_steps = int(60 * 60 * 24 * FLAGS.days / TIMESTEP)
+    num_vehicles = FLAGS.vehicles
 
-    print("Start Datetime: {}".format(get_local_datetime(START_TIME)))
-    end_time = START_TIME + NUM_SIMULATION_STEPS * TIMESTEP
+    start_time = FLAGS.start_time + int(60 * 60 * 24 * FLAGS.start_offset / TIMESTEP)
+    print("Start Datetime: {}".format(get_local_datetime(start_time)))
+    end_time = start_time + num_simulation_steps * TIMESTEP
     print("End Datetime  : {}".format(get_local_datetime(end_time)))
 
-    if args.train:
+    if FLAGS.train:
         print("Set training mode")
         dispatch_policy = DQNDispatchPolicyLearner()
-        dispatch_policy.build_q_network(load_network=args.load)
+        dispatch_policy.build_q_network(load_network=FLAGS.load_network)
+
+        if FLAGS.load_memory:
+            dispatch_policy.load_experience_memory(FLAGS.load_memory)
+
+        if FLAGS.pretrain > 0:
+            for i in range(FLAGS.pretrain):
+                average_loss, average_q_max = dispatch_policy.train_network(BATCH_SIZE, NUM_ITERATIONS)
+                print("iterations : {}, average_loss : {:.3f}, average_q_max : {:.3f}".format(i, average_loss, average_q_max))
+                dispatch_policy.q_network.write_summary(average_loss, average_q_max)
 
     else:
         dispatch_policy = DQNDispatchPolicy()
-        if args.load:
-            dispatch_policy.build_q_network(load_network=args.load)
-
-    if args.train and args.pretrain > 0:
-        # dispatch_policy.load_experience_memory(NUM_SUPPLY_DEMAND_HISTORY - 1)
-        dispatch_policy.load_experience_memory(NUM_SIMULATION_STEPS)
-
-        for i in range(args.pretrain):
-            average_loss, average_q_max = dispatch_policy.train_network(BATCH_SIZE, NUM_ITERATIONS)
-            print("iterations : {}, average_loss : {:.3f}, average_q_max : {:.3f}".format(i, average_loss, average_q_max))
-            dispatch_policy.q_network.write_summary(average_loss, average_q_max)
+        dispatch_policy.build_q_network(load_network=FLAGS.load_network)
 
     matching_policy = RoughMatchingPolicy()
-    dqn_exp = Experiment(START_TIME, TIMESTEP, dispatch_policy, matching_policy, use_pattern=args.pattern)
+    dqn_exp = Experiment(start_time, TIMESTEP, dispatch_policy, matching_policy)
     dqn_exp.reset()
-    if args.train:
+    if FLAGS.train:
         dispatch_policy.reset()
-    dqn_exp.populate_vehicles(n_vehicles=NUM_VEHICLES)
+    dqn_exp.populate_vehicles(n_vehicles=num_vehicles)
 
 
     epoch = 3600 * 24 / TIMESTEP
-    for i in range(NUM_SIMULATION_STEPS):
-        if i % epoch == 0:
-            dqn_exp.simulator.log_score()
+    for i in range(num_simulation_steps):
+        dqn_exp.step(verbose=FLAGS.verbose)
 
-        #     dqn_exp.reset()
-        #     if args.train:
-        #         dispatch_policy.reset()
-        #     dqn_exp.populate_vehicles(n_vehicles=NUM_VEHICLES)
+        if i == 0:
+            continue
 
         if i % int(3600 / TIMESTEP) == 0:
             print("Elapsed : {:.0f} hours".format(i * TIMESTEP / 3600.0))
-        dqn_exp.step(verbose=args.verbose)
 
-        if args.train and i % NUM_SUPPLY_DEMAND_HISTORY == NUM_SUPPLY_DEMAND_HISTORY - 1:
+        if i % epoch == 0:
+            dqn_exp.simulator.log_score()
+
+        if FLAGS.train and (i % (epoch * 7) == 0 or i == num_simulation_steps - 1):
             print("Dumping experience memory as pickle...")
             dispatch_policy.dump_experience_memory(i)
-
-    if args.train:
-        print("Dumping experience memory as pickle...")
-        dispatch_policy.dump_experience_memory(NUM_SIMULATION_STEPS)

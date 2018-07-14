@@ -1,11 +1,11 @@
 from common import vehicle_status_codes
 from .services.demand_prediction_service import DemandPredictionService
-from config.settings import DEMAND_AMPLIFICATION_FACTOR, NUM_VEHICLES, TIMESTEP, MIN_UPDATE_CYCLE
+from config.settings import TIMESTEP, MIN_UPDATE_CYCLE
 import numpy as np
 
 class DispatchPolicy(object):
     def __init__(self):
-        self.demand_predictor = DemandPredictionService(amplification_factor=DEMAND_AMPLIFICATION_FACTOR)
+        self.demand_predictor = DemandPredictionService()
         self.updated_at = {}
 
     def dispatch(self, current_time, vehicles):
@@ -38,7 +38,7 @@ class DispatchPolicy(object):
         ]]
 
         tbd_vehicles = tbd_idle_vehicles.append(tbd_cruising_vehicles)
-        max_n = int(NUM_VEHICLES / MIN_UPDATE_CYCLE * TIMESTEP)
+        max_n = int(len(vehicles) / MIN_UPDATE_CYCLE * TIMESTEP)
         if len(tbd_vehicles) > max_n:
             p = np.random.permutation(len(tbd_vehicles))
             tbd_vehicles = tbd_vehicles.iloc[p[:max_n]]

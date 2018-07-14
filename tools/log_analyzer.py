@@ -2,7 +2,7 @@ import pandas as pd
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/../movi/')
-from config.settings import START_TIME, TIMESTEP
+# from config.settings import TIMESTEP
 from common import time_utils, vehicle_status_codes, customer_status_codes
 
 log_dir_path = "data/logs/"
@@ -43,10 +43,11 @@ summary_log_cols = [
 
 score_log_cols = [
     "t",
+    "vehicle_id",
     "earning",
     "idle",
-    "occupied",
     "cruising",
+    "occupied",
     "assigned",
     "offduty"
 ]
@@ -70,7 +71,7 @@ class LogAnalyzer(object):
             except IOError:
                 break
         df = pd.concat(dfs)
-        df = df[df.t >= START_TIME + skip_minutes * 60]
+        df = df[df.t >= df.t.min() + skip_minutes * 60]
         return df
 
     def load_vehicle_log(self, log_dir_path, max_num=100, skip_minutes=0):
@@ -84,7 +85,8 @@ class LogAnalyzer(object):
 
     def load_score_log(self, log_dir_path, max_num=100, skip_minutes=0):
         df = self.load_log(log_dir_path + score_log_file, score_log_cols, max_num, skip_minutes)
-        df["t"] = (df.t - START_TIME) / 3600
+        df["t"] = (df.t - df.t.min()) / 3600
+        df = df[df.t == df.t.max()]
         df["working"] = df.occupied + df.idle + df.cruising + df.assigned
         df["occupancy_rate"] = df.occupied / df.working
         df["cruising_rate"] = (df.cruising + df.assigned) / df.working
@@ -106,5 +108,6 @@ class LogAnalyzer(object):
         return df
 
     def add_time_bin(self, df, bin_width):
-        return ((df.t - START_TIME) / bin_width).astype(int) * int(bin_width) + START_TIME
+        start_time = df.t.min()
+        return ((df.t - start_time) / bin_width).astype(int) * int(bin_width) + start_time
 

@@ -4,12 +4,13 @@ from .vehicle_behavior import Occupied, Cruising, Idle, Assigned, OffDuty
 from logger import sim_logger
 from logging import getLogger
 import numpy as np
+from dqn.settings import FLAGS
 
 class Vehicle(object):
     behavior_models = {
         vehicle_status_codes.IDLE: Idle(),
-        vehicle_status_codes.OCCUPIED: Occupied(),
         vehicle_status_codes.CRUISING: Cruising(),
+        vehicle_status_codes.OCCUPIED: Occupied(),
         vehicle_status_codes.ASSIGNED: Assigned(),
         vehicle_status_codes.OFF_DUTY: OffDuty()
     }
@@ -177,4 +178,5 @@ class Vehicle(object):
         self.state.status = status
 
     def __log(self):
-        sim_logger.log_vehicle_event(self.state.to_msg())
+        if FLAGS.log_vehicle:
+            sim_logger.log_vehicle_event(self.state.to_msg())
