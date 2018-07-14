@@ -7,8 +7,8 @@ from logger import sim_logger
 
 class Experiment(object):
 
-    def __init__(self, start_time, timestep, dispatch_policy, matching_policy, use_pattern=False):
-        self.simulator = Simulator(start_time, timestep, use_pattern)
+    def __init__(self, start_time, timestep, dispatch_policy, matching_policy):
+        self.simulator = Simulator(start_time, timestep)
         self.agent = Agent(dispatch_policy, matching_policy)
 
     def reset(self, start_time=None, timestep=None):

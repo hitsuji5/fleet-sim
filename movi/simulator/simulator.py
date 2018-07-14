@@ -4,18 +4,18 @@ from .services.demand_generation_service import DemandGenerator
 from .services.routing_service import RoutingService
 
 
-from config.settings import IDLE_DURATION_LIMIT, REST_PROBABILITY, REST_DURATION
+from config.settings import REST_DURATION
 import numpy as np
 from logger import sim_logger
 from logging import getLogger
 
 class Simulator(object):
 
-    def __init__(self, start_time, timestep, use_pattern=False):
+    def __init__(self, start_time, timestep):
         self.reset(start_time, timestep)
-        sim_logger.set_env(self)
+        sim_logger.setup_logging(self)
         self.logger = getLogger(__name__)
-        self.demand_generator = DemandGenerator(use_pattern)
+        self.demand_generator = DemandGenerator()
         self.routing_service = RoutingService()
 
     def reset(self, start_time=None, timestep=None):
@@ -39,8 +39,8 @@ class Simulator(object):
 
         for vehicle in VehicleRepository.get_all():
             vehicle.step(self.__dt)
-            if vehicle.get_idle_duration() >= IDLE_DURATION_LIMIT and np.random.random() < REST_PROBABILITY:
-                vehicle.take_rest(np.random.randint(REST_DURATION))
+            # if vehicle.get_idle_duration() >= IDLE_DURATION_LIMIT and np.random.random() < REST_PROBABILITY:
+            #     vehicle.take_rest(np.random.randint(REST_DURATION))
 
         self.__populate_new_customers()
         self.__update_time()
@@ -78,8 +78,12 @@ class Simulator(object):
             if vehicle is None:
                 self.logger.warning("Invalid Vehicle id")
                 continue
-            vehicles.append(vehicle)
-            od_pairs.append((vehicle.get_location(), command["destination"]))
+
+            if "offduty" in command:
+                vehicle.take_rest(REST_DURATION)
+            else:
+                vehicles.append(vehicle)
+                od_pairs.append((vehicle.get_location(), command["destination"]))
         routes = self.routing_service.route(od_pairs)
 
         for vehicle, (route, distance, triptime) in zip(vehicles, routes):
@@ -106,5 +110,5 @@ class Simulator(object):
 
     def log_score(self):
         for vehicle in VehicleRepository.get_all():
-            score = ','.join(map(str, [self.get_current_time()] + vehicle.get_score()))
+            score = ','.join(map(str, [self.get_current_time(), vehicle.get_id()] + vehicle.get_score()))
             sim_logger.log_score(score)
