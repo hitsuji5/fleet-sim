@@ -2,11 +2,12 @@ import pickle
 import os
 import numpy as np
 from collections import OrderedDict, defaultdict
+from .settings import FLAGS
+from config.settings import GLOBAL_STATE_UPDATE_CYCLE
 from .feature_constructor import FeatureConstructor
 from .q_network import DeepQNetwork, FittingDeepQNetwork
 from agent.dispatch_policy import DispatchPolicy
 from . import settings
-from .settings import FLAGS
 from common.time_utils import get_local_datetime
 from common import vehicle_status_codes, mesh
 
@@ -24,7 +25,7 @@ class DQNDispatchPolicy(DispatchPolicy):
 
     def update_state(self, current_time, vehicles):
         t = self.feature_constructor.get_current_time()
-        if t == 0 or current_time % settings.DEMAND_SUPPLY_UPDATE_CYCLE == 0:
+        if t == 0 or current_time % GLOBAL_STATE_UPDATE_CYCLE == 0:
             self.q_cache = {}
             self.feature_constructor.update_supply(vehicles)
             demand = self.demand_predictor.predict(current_time, horizon=2)
@@ -38,12 +39,15 @@ class DQNDispatchPolicy(DispatchPolicy):
         for vehicle_id, vehicle_state in tbd_vehicles.iterrows():
             a, offduty = self.predict_best_action(vehicle_id, vehicle_state)
             if offduty:
-                command = self.create_command(vehicle_id, None, offduty=True)
+                command = self.create_command(vehicle_id, offduty=True)
             else:
-                target = self.convert_action_to_destination(vehicle_state, a)
+                target, cache_key = self.convert_action_to_destination(vehicle_state, a)
                 if target is None:
                     continue
-                command = self.create_command(vehicle_id, target)
+                if cache_key is None:
+                    command = self.create_command(vehicle_id, target)
+                else:
+                    command = self.create_command(vehicle_id, cache_key=cache_key)
             commands.append(command)
         return commands
 
@@ -57,25 +61,35 @@ class DQNDispatchPolicy(DispatchPolicy):
         else:
             x, y = mesh.convert_lonlat_to_xy(vehicle_state.lon, vehicle_state.lat)
             if (x, y) in self.q_cache:
-                actions, Q = self.q_cache[(x, y)]
+                actions, Q, amax = self.q_cache[(x, y)]
             else:
                 s, actions = self.feature_constructor.construct_current_features(x, y)
                 Q = self.q_network.compute_q_values(s)
-                self.q_cache[(x, y)] = actions, Q
-            aidx = self.q_network.get_action(Q)
+                amax = np.argmax(Q)
+                self.q_cache[(x, y)] = actions, Q, amax
+            if actions[amax] == (0, 0):
+                aidx = amax
+            else:
+                aidx = self.q_network.get_action(Q, amax)
             a = actions[aidx]
             offduty = 1 if Q[aidx] < FLAGS.offduty_threshold else 0
         return a, offduty
 
 
     def convert_action_to_destination(self, vehicle_state, a):
+        cache_key = None
+        target = None
         ax, ay = a
         x, y = mesh.convert_lonlat_to_xy(vehicle_state.lon, vehicle_state.lat)
         lon, lat = mesh.convert_xy_to_lonlat(x + ax, y + ay)
         if lon == vehicle_state.lon and lat == vehicle_state.lat:
-            return None
-        return lat, lon
+            pass
+        elif FLAGS.use_osrm and mesh.convert_xy_to_lonlat(x, y) == (lon, lat):
+            cache_key = ((x, y), (ax, ay))
+        else:
+            target = (lat, lon)
 
+        return target, cache_key
 
 
 class DQNDispatchPolicyLearner(DQNDispatchPolicy):
@@ -94,15 +108,15 @@ class DQNDispatchPolicyLearner(DQNDispatchPolicy):
         self.rewards = defaultdict(int)
         self.last_earnings = defaultdict(int)
 
-    def dump_experience_memory(self, t=0):
-        sd_path = os.path.join(FLAGS.save_memory_dir, "sd_history_{}.pkl".format(t))
-        sars_path = os.path.join(FLAGS.save_memory_dir, "sars_history_{}.pkl".format(t))
+    def dump_experience_memory(self):
+        sd_path = os.path.join(FLAGS.save_memory_dir, "sd_history.pkl")
+        sars_path = os.path.join(FLAGS.save_memory_dir, "sars_history.pkl")
         pickle.dump(self.supply_demand_history, open(sd_path, "wb"))
         pickle.dump(self.experience_memory, open(sars_path, "wb"))
 
-    def load_experience_memory(self, path, t=0):
-        sd_path = os.path.join(path, "sd_history_{}.pkl".format(t))
-        sars_path = os.path.join(path, "sars_history_{}.pkl".format(t))
+    def load_experience_memory(self, path):
+        sd_path = os.path.join(path, "sd_history.pkl")
+        sars_path = os.path.join(path, "sars_history.pkl")
         self.supply_demand_history = pickle.load(open(sd_path, "rb"))
         self.experience_memory = pickle.load(open(sars_path, "rb"))
 
@@ -116,9 +130,6 @@ class DQNDispatchPolicyLearner(DQNDispatchPolicy):
     def build_q_network(self, load_network=None):
         self.q_network = FittingDeepQNetwork(load_network)
 
-    # def get_commands(self, tbd_vehicles):
-    #     commands = super().get_commands(tbd_vehicles)
-    #     return commands
 
     def predict_best_action(self, vehicle_id, vehicle_state):
         a, offduty = super().predict_best_action(vehicle_id, vehicle_state)
@@ -132,7 +143,7 @@ class DQNDispatchPolicyLearner(DQNDispatchPolicy):
     def give_rewards(self, vehicles):
         for vehicle_id, row in vehicles.iterrows():
             earnings = row.earnings - self.last_earnings.get(vehicle_id, 0)
-            self.rewards[vehicle_id] += earnings * settings.EARNINGS_REWARD_FACTOR + settings.STATE_REWARD_TABLE[row.status]
+            self.rewards[vehicle_id] += earnings + settings.STATE_REWARD_TABLE[row.status]
             self.last_earnings[vehicle_id] = row.earnings
             if row.status == vehicle_status_codes.OFF_DUTY:
                 self.last_state_actions[vehicle_id] = None
@@ -152,7 +163,7 @@ class DQNDispatchPolicyLearner(DQNDispatchPolicy):
     def backup_supply_demand(self):
         current_time = self.feature_constructor.get_current_time()
 
-        if current_time % settings.DEMAND_SUPPLY_UPDATE_CYCLE == 0:
+        if current_time % GLOBAL_STATE_UPDATE_CYCLE == 0:
             f = self.q_network.get_fingerprint()
             self.feature_constructor.update_fingerprint(f)
             self.supply_demand_history[current_time] = self.feature_constructor.get_supply_demand_maps(), f
@@ -161,7 +172,7 @@ class DQNDispatchPolicyLearner(DQNDispatchPolicy):
                 self.supply_demand_history.popitem(last=False)
 
     def replay_supply_demand(self, t):
-        t_ = t - (t % settings.DEMAND_SUPPLY_UPDATE_CYCLE)
+        t_ = t - (t % GLOBAL_STATE_UPDATE_CYCLE)
         if t_ in self.supply_demand_history:
             return self.supply_demand_history[t_]
         else:
@@ -207,19 +218,23 @@ class DQNDispatchPolicyLearner(DQNDispatchPolicy):
             state_action, next_state, reward = self.experience_memory[num]
             t, l, a = state_action
             next_t, next_l = next_state
+            if self.feature_constructor.reachable_map[next_l] == 0:
+                self.experience_memory.pop(num)
+                continue
             sd, f = self.replay_supply_demand(t)
             if sd is None:
+                self.experience_memory.pop(num)
                 continue
             next_sd, next_f = self.replay_supply_demand(next_t)
             if next_sd is None:
+                self.experience_memory.pop(num)
+                continue
+            a_feature = self.feature_constructor.construct_action_feature(t, l, sd, a)
+            if a_feature is None:
+                self.experience_memory.pop(num)
                 continue
 
-            # if not (t in self.supply_demand_history and next_t in self.supply_demand_history):
-            #     self.experience_memory.pop(num)
-            #     continue
-
             s_feature = self.feature_constructor.construct_state_feature(t, f, l, sd)
-            a_feature = self.feature_constructor.construct_action_feature(t, l, sd, a)
             sa = s_feature + a_feature
             next_sa, _ = self.feature_constructor.construct_features(next_t, next_f, next_l, next_sd)
             target_value = self.q_network.compute_target_value(next_sa)

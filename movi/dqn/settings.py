@@ -24,45 +24,38 @@ flags.DEFINE_integer('vehicles', 10000, "number of vehicles")
 flags.DEFINE_integer('start_time', 1462075200 + 3600 * 4, "simulation start datetime (unixtime)")
 flags.DEFINE_integer('start_offset', 0, "simulation start datetime offset (days)")
 flags.DEFINE_integer('days', 14, "simulation days")
-# flags.DEFINE_string('logdir', 'base', "base log directory name")
+flags.DEFINE_integer('n_diffusions', 3, "number of diffusion convolution")
 flags.DEFINE_string('tag', 'base', "tag used to identify logs")
 flags.DEFINE_boolean('log_vehicle', False, "whether to log vehicle states")
+flags.DEFINE_boolean('use_osrm', False, "whether to use OSRM")
 
-# data_dir_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../data/dqn")
-# SAVE_NETWORK_PATH = os.path.join(data_dir_path, 'networks')
-# SAVE_SUMMARY_PATH = os.path.join(data_dir_path, 'summary')
-# REPLAY_MEMORY_PATH = os.path.join(data_dir_path, 'memory')
-# OFFDUTY_THRESHOLD = -1000
-# REST_ACTION_PROBABILITY = 0.10
-# ALPHA = 0.0 # Entropy Coefficient
+GAMMA = 0.98  # Discount Factor
+MAX_MOVE = 7
+NUM_SUPPLY_DEMAND_MAPS = 4
+NUM_FEATURES = 41
 
 
+# training hyper parameters
+WORKING_COST = 0.2
+DRIVING_COST = 0.2
 STATE_REWARD_TABLE = {
-    vehicle_status_codes.IDLE : -0.1,
-    vehicle_status_codes.CRUISING : -0.2,
-    vehicle_status_codes.ASSIGNED : -0.2,
-    vehicle_status_codes.OCCUPIED : -0.2,
+    vehicle_status_codes.IDLE : -WORKING_COST,
+    vehicle_status_codes.CRUISING : -(WORKING_COST + DRIVING_COST),
+    vehicle_status_codes.ASSIGNED : -(WORKING_COST + DRIVING_COST),
+    vehicle_status_codes.OCCUPIED : -(WORKING_COST + DRIVING_COST),
     vehicle_status_codes.OFF_DUTY : 0.0
 }
-EARNINGS_REWARD_FACTOR = 1.0
-
-
-DEMAND_SUPPLY_UPDATE_CYCLE = 300
-GAMMA = 0.99  # Discount Factor
-MAX_MOVE = 5
-NUM_SUPPLY_DEMAND_MAPS = 4
-NUM_FEATURES = 35
 WAIT_ACTION_PROBABILITY = 0.70  # wait action probability in epsilon-greedy
-EXPLORATION_STEPS = 10000  # Number of steps over which the initial value of epsilon is linearly annealed to its final value
+EXPLORATION_STEPS = 5000  # Number of steps over which the initial value of epsilon is linearly annealed to its final value
 INITIAL_EPSILON = 1.0  # Initial value of epsilon in epsilon-greedy
 FINAL_EPSILON = 0.05  # Final value of epsilon in epsilon-greedy
 INITIAL_MEMORY_SIZE = 100  # Number of steps to populate the replay memory before training starts
 NUM_SUPPLY_DEMAND_HISTORY = 10000
 MAX_MEMORY_SIZE = 10000000  # Number of replay memory the agent uses for training
-SAVE_INTERVAL = 2000  # The frequency with which the network is saved
+SAVE_INTERVAL = 1000  # The frequency with which the network is saved
 BATCH_SIZE = 64  # Mini batch size
-NUM_ITERATIONS = 1 # Number of batches
-TARGET_UPDATE_INTERVAL = 100  # The frequency with which the target network is updated
+NUM_ITERATIONS = 2 # Number of batches
+TARGET_UPDATE_INTERVAL = 50  # The frequency with which the target network is updated
 LEARNING_RATE = 0.00025  # Learning rate used by RMSProp
 MOMENTUM = 0.95  # Momentum used by RMSProp
 MIN_GRAD = 0.01  # Constant added to the squared gradient in the denominator of the RMSProp update

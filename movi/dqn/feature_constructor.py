@@ -1,60 +1,105 @@
 import numpy as np
+import os
 from common.time_utils import get_local_datetime
-from config.settings import MAP_WIDTH, MAP_HEIGHT
-from .settings import MAX_MOVE, NUM_SUPPLY_DEMAND_MAPS
+from config.settings import MAP_WIDTH, MAP_HEIGHT, DATA_DIR, MIN_DISPATCH_CYCLE
+from .settings import MAX_MOVE, NUM_SUPPLY_DEMAND_MAPS, FLAGS
 from common import vehicle_status_codes, mesh
+
 
 class FeatureConstructor(object):
 
     def __init__(self):
         self.t = 0
         self.fingerprint = (100000, 0)
-        self.action_space = [(0, 0)] + [(ax, ay) for ax in range(-MAX_MOVE, MAX_MOVE + 1)
-                                        for ay in range(-MAX_MOVE, MAX_MOVE + 1)
-                                        if ax ** 2 + ay ** 2 >= 1]
+        # self.action_space = [(0, 0)] + [(ax, ay) for ax in range(-MAX_MOVE, MAX_MOVE + 1)
+        #                                 for ay in range(-MAX_MOVE, MAX_MOVE + 1)
+        #                                 if ax ** 2 + ay ** 2 >= 1]
+        self.reachable_map = self.load_reachable_map()
+        self.state_space = [(x, y) for x in range(MAP_WIDTH) for y in range(MAP_HEIGHT) if self.reachable_map[x, y] == 1]
+        self.tt_map = self.load_tt_map()
+        self.D_out, self.D_in = self.build_diffusion_filter()
+        self.d_entropy = self.build_diffusion_entropy_map()
+
+
+    def action_space_iter(self, x, y):
+        yield (0, 0)
+        for ax in range(-MAX_MOVE, MAX_MOVE + 1):
+            for ay in range(-MAX_MOVE, MAX_MOVE + 1):
+                if ax == 0 and ay == 0:
+                    continue
+                x_ = x + ax
+                y_ = y + ay
+                if self.is_reachable(x_, y_):
+                    yield (ax, ay)
+
+
+    def load_reachable_map(self):
+        return np.load(os.path.join(DATA_DIR, 'reachable_map.npy'))
+
+        # if FLAGS.use_osrm:
+        #     return np.load(os.path.join(DATA_DIR, 'reachable_map.npy'))
+        # return np.ones((MAP_WIDTH, MAP_HEIGHT))
+
+    def load_tt_map(self):
+        return np.load(os.path.join(DATA_DIR, 'tt_map.npy')) / MIN_DISPATCH_CYCLE / 2.0
+
+        # if FLAGS.use_osrm:
+        #     return np.load(os.path.join(DATA_DIR, 'tt_map.npy')) / MAX_DISPATCH_CYCLE
+        #
+        # n = MAX_MOVE * 2 + 1
+        # tt_map = np.ones((MAP_WIDTH, MAP_HEIGHT, n, n)) * float('inf')
+        #
+        # for x, y in self.state_space:
+        #     for ax, ay in self.action_space_iter(x, y):
+        #         axi, ayi = MAX_MOVE + ax, MAX_MOVE + ay
+        #         tt_map[x, y, axi, ayi] = np.sqrt(ax ** 2 + ay ** 2) / (MAX_MOVE + 1)
+        # return tt_map
+
+    def build_diffusion_filter(self):
+        D_out = np.exp(-self.tt_map * 2)
+        for x, y in self.state_space:
+            D_out[x, y] /= D_out[x, y].sum()
+
         n = MAX_MOVE * 2 + 1
-        self.tt_map = np.zeros((MAP_WIDTH, MAP_HEIGHT, n, n))
-        for ax, ay in self.action_space:
-            x, y = MAX_MOVE + ax, MAX_MOVE + ay
-            self.tt_map[:, :, x, y] = np.sqrt(ax ** 2 + ay ** 2) / (MAX_MOVE + 1)
+        D_in = np.zeros((MAP_WIDTH, MAP_HEIGHT, n, n))
+        for x, y in self.state_space:
+            for ax, ay in self.action_space_iter(x, y):
+                axi, ayi = MAX_MOVE + ax, MAX_MOVE + ay
+                D_in[x, y, axi, ayi] = D_out[x + ax, y + ay, -axi, -ayi]
+        return D_out, D_in
 
-        self.D_out = np.exp(-self.tt_map)
-        for x in range(MAP_WIDTH):
-            for y in range(MAP_HEIGHT):
-                self.D_out[x, y] /= self.D_out[x, y].sum()
 
-        self.D_in = np.zeros((MAP_WIDTH, MAP_HEIGHT, n, n))
-        for x in range(MAP_WIDTH):
-            for y in range(MAP_HEIGHT):
-                for ax in range(n):
-                    for ay in range(n):
-                        if x + ax < MAP_WIDTH and y + ay < MAP_HEIGHT:
-                            self.D_in[x, y, ax, ay] = self.D_out[x + ax, y + ay, -ax, -ay]
-
+    def build_diffusion_entropy_map(self):
+        entropy = np.zeros((MAP_WIDTH, MAP_HEIGHT))
+        for x, y in self.state_space:
+            entropy[x, y] = -(self.D_out[x, y] * np.log(self.D_out[x, y] + 1e-6)).sum()
+        entropy /= np.log((MAX_MOVE * 2 + 1) ** 2 + 1e-6)
+        diffused_entropy = [entropy] + self.diffusion_convolution(entropy, self.D_out, FLAGS.n_diffusions - 1)
+        return diffused_entropy
 
     def update_time(self, current_time):
         self.t = current_time
 
-    def update_supply(self, vehicles, duration=900):
+    def update_supply(self, vehicles, duration=MIN_DISPATCH_CYCLE * 2):
         idle = vehicles[(vehicles.status == vehicle_status_codes.IDLE) | (vehicles.status == vehicle_status_codes.CRUISING)]
         occupied = vehicles[vehicles.status == vehicle_status_codes.OCCUPIED]
         occupied = occupied[occupied.time_to_destination <= duration]
         stopped_vehicle_map = self.construct_supply_map(idle[["lon", "lat"]].values)
         dropoff_map = self.construct_supply_map(occupied[["destination_lon", "destination_lat"]].values)
         self.supply_maps = [stopped_vehicle_map, dropoff_map]
-
-        diffused_smap1 = [self.diffuse_map(sum(self.supply_maps), self.D_in)]
-        diffused_smap2 = [self.diffuse_map(s, self.D_in) for s in diffused_smap1]
-        diffused_smap3 = [self.diffuse_map(s, self.D_in) for s in diffused_smap2]
-        self.diffused_supply = diffused_smap1 + diffused_smap2 + diffused_smap3
+        self.diffused_supply = self.diffusion_convolution(sum(self.supply_maps), self.D_in, FLAGS.n_diffusions)
 
     def update_demand(self, demand, normalized_factor=0.1):
         self.demand_maps = [d * normalized_factor for d in demand]
+        self.diffused_demand = self.diffusion_convolution(sum(self.demand_maps), self.D_out, FLAGS.n_diffusions)
 
-        diffused_dmap1 = [self.diffuse_map(sum(self.demand_maps), self.D_out)]
-        diffused_dmap2 = [self.diffuse_map(d, self.D_out) for d in diffused_dmap1]
-        diffused_dmap3 = [self.diffuse_map(d, self.D_out) for d in diffused_dmap2]
-        self.diffused_demand = diffused_dmap1 + diffused_dmap2 + diffused_dmap3
+    def diffusion_convolution(self, map, d_filter, k):
+        M = map
+        diffused_maps = []
+        for _ in range(k):
+            M = self.diffuse_map(M, d_filter)
+            diffused_maps.append(M)
+        return diffused_maps
 
 
     def diffuse_map(self, map, d_filter):
@@ -64,11 +109,6 @@ class FeatureConstructor(object):
         for x in range(MAP_WIDTH):
             for y in range(MAP_HEIGHT):
                 diffused_map[x, y] = (padded_map[x : x + d, y : y + d] * d_filter[x, y]).sum()
-        # diffused_map = sum([padded_map[x + MAX_MOVE : x + MAX_MOVE + MAP_WIDTH, y + MAX_MOVE : y + MAX_MOVE + MAP_HEIGHT]
-        #                 * np.exp(-(x ** 2  + y ** 2) / (MAX_MOVE ** 2))
-        #                     for x, y in self.action_space
-        #                     if x ** 2 + y ** 2 <= MAX_MOVE ** 2]) / (MAX_MOVE ** 2 * np.pi)
-
         return diffused_map
 
     def update_fingerprint(self, fingerprint):
@@ -92,6 +132,7 @@ class FeatureConstructor(object):
         x, y = l
         state_feature = [m.mean() for m in M[:NUM_SUPPLY_DEMAND_MAPS]]
         state_feature += [m[x, y] for m in M]
+        state_feature += [m[x, y] for m in self.d_entropy]
         state_feature += self.construct_location_features(l) + self.construct_time_features(t) + self.construct_fingerprint_features(f)
         return state_feature
 
@@ -99,34 +140,30 @@ class FeatureConstructor(object):
         actions = []
         action_features = []
 
-        for ax, ay in self.action_space:
+        for ax, ay in self.action_space_iter(*l):
             a = (ax, ay)
             feature = self.construct_action_feature(t, l, M, a)
             if feature is not None:
                 actions.append(a)
                 action_features.append(feature)
 
-        # rest action
-        # rest = 1
-        # a = (0, 0, rest)
-        # feature = self.construct_action_feature(t, l, M, a)
-        # if feature is not None:
-        #     actions.append(a)
-        #     action_features.append(feature)
-
         return actions, action_features
+
+    def is_reachable(self, x, y):
+        return 0 <= x and x < MAP_WIDTH and 0 <= y and y < MAP_HEIGHT and self.reachable_map[x, y] == 1
 
     def construct_action_feature(self, t, l, M, a):
         x, y = l
         ax, ay = a
         x_ = x + ax
         y_ = y + ay
-        if x_ < MAP_WIDTH and y_ < MAP_HEIGHT and x_ >= 0 and y_ >= 0:
-            tt = self.get_triptime(x, y, ax, ay)
-            if tt <= 1:
-                action_feature = [m[x_, y_] for m in M]
-                action_feature += self.construct_location_features((x_, y_)) + [tt]
-                return action_feature
+        # if self.is_reachable(x_, y_):
+        tt = self.get_triptime(x, y, ax, ay)
+        if tt <= 1:
+            action_feature = [m[x_, y_] for m in M]
+            action_feature += [m[x_, y_] for m in self.d_entropy]
+            action_feature += self.construct_location_features((x_, y_)) + [tt]
+            return action_feature
 
         return None
 
@@ -140,22 +177,8 @@ class FeatureConstructor(object):
         diffused_maps = self.diffused_supply + self.diffused_demand
         return supply_demand_maps + diffused_maps
 
-    # def extract_box(self, F, x, y, size):
-    #     X = self.construct_initial_map(w=size, h=size)
-    #     d = int((size - 1) / 2)
-    #     w, h = F.shape
-    #     X[max(d-x, 0):min(d+w-x, size), max(d-y, 0):min(d+h-y, size)] = F[max(x-d, 0):min(x+d+1, w), max(y-d, 0):min(y+d+1, h)]
-    #     return X
-
-
     def construct_initial_map(self, w=MAP_WIDTH, h=MAP_HEIGHT):
         return np.zeros((w, h), dtype=np.float32)
-
-
-    # def construct_point_map_feature(self, x, y):
-    #     M = self.construct_initial_map(w=FEATURE_MAP_SIZE, h=FEATURE_MAP_SIZE)
-    #     M[x, y] = 1.0
-    #     return M
 
     def construct_supply_map(self, locations):
         supply_map = self.construct_initial_map()

@@ -22,16 +22,22 @@ docker run -t -v $(pwd):/data osrm/osrm-backend osrm-customize /data/NewYork.osr
 
 ### 4. Download Trip Data
 ```commandline
-wget https://s3.amazonaws.com/nyc-tlc/trip+data/yellow_tripdata_2016-05.csv -P trip_data
-wget https://s3.amazonaws.com/nyc-tlc/trip+data/green_tripdata_2016-05.csv -P trip_data
+wget https://s3.amazonaws.com/nyc-tlc/trip+data/yellow_tripdata_2016-05.csv -P trip_records
+wget https://s3.amazonaws.com/nyc-tlc/trip+data/green_tripdata_2016-05.csv -P trip_records
 ```
 
 ### 5. Preprocess Trip Data
 ```commandline
-python movi/preprocessing/preprocess_nyc_dataset.py trip_data/ --month 2016-05
-python movi/preprocessing/create_backlog.py trip_data/trips_2016-05.csv
+python movi/preprocessing/preprocess_nyc_dataset.py trip_records/ --month 2016-05
+python movi/preprocessing/create_backlog.py trip_records/trips_2016-05.csv
 python movi/preprocessing/create_prediction.py
 ```
+
+### 6. Create Mesh Map
+```commandline
+python movi/preprocessing/create_tt_map.py ./data
+```
+
 
 ## Run Simulation
 ### 1. Run OSRM container
@@ -42,11 +48,11 @@ docker run -t -i -p 5000:5000 -v $(pwd):/data osrm/osrm-backend osrm-routed --al
 
 ### 2. Training
 ```commandline
-python movi/run.py --train
+sh bin/train.sh
 ```
 
 
 ### 3. Evaluation
 ```commandline
-python movi/run.py
+sh bin/eval.sh
 ```

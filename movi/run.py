@@ -4,7 +4,7 @@ import os
 
 import argparse
 from experiment import Experiment
-from agent.matching_policy import RoughMatchingPolicy
+from agent.matching_policy import GreedyMatchingPolicy
 from dqn.dqn_policy import DQNDispatchPolicy, DQNDispatchPolicyLearner
 from dqn.settings import BATCH_SIZE, NUM_ITERATIONS, NUM_SUPPLY_DEMAND_HISTORY, FLAGS
 from config.settings import TIMESTEP, DEFAULT_LOG_DIR
@@ -30,16 +30,6 @@ def setup_base_log_dir(base_log_dir):
     os.symlink(base_log_dir, DEFAULT_LOG_DIR)
 
 if __name__ == '__main__':
-    # parser = argparse.ArgumentParser()
-    # parser.add_argument("--pattern", action='store_true', help="use request pattern for demand generation")
-    # parser.add_argument("--train", action='store_true', help="run training dqn network")
-    # parser.add_argument("--load", action='store_true', help="load saved dqn network")
-    # parser.add_argument("--verbose", action='store_true', help="print log verbosely")
-    # parser.add_argument("--pretrain", type=int, default=0, help="run N pretraining steps using pickled experience memory")
-    # parser.add_argument("--logdir", default='./logs/base', help="base log directory")
-    # parser.add_argument("--vehicles", type=int, default=9000, help="number of vehicles")
-    # parser.add_argument("--days", type=int, default=7, help="simulation days")
-    # args = parser.parse_args()
     setup_base_log_dir(FLAGS.tag)
 
     num_simulation_steps = int(60 * 60 * 24 * FLAGS.days / TIMESTEP)
@@ -68,7 +58,7 @@ if __name__ == '__main__':
         dispatch_policy = DQNDispatchPolicy()
         dispatch_policy.build_q_network(load_network=FLAGS.load_network)
 
-    matching_policy = RoughMatchingPolicy()
+    matching_policy = GreedyMatchingPolicy()
     dqn_exp = Experiment(start_time, TIMESTEP, dispatch_policy, matching_policy)
     dqn_exp.reset()
     if FLAGS.train:
@@ -91,4 +81,4 @@ if __name__ == '__main__':
 
         if FLAGS.train and (i % (epoch * 7) == 0 or i == num_simulation_steps - 1):
             print("Dumping experience memory as pickle...")
-            dispatch_policy.dump_experience_memory(i)
+            dispatch_policy.dump_experience_memory()

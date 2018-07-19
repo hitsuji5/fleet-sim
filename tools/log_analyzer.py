@@ -2,7 +2,7 @@ import pandas as pd
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/../movi/')
-# from config.settings import TIMESTEP
+from dqn.settings import WORKING_COST, DRIVING_COST
 from common import time_utils, vehicle_status_codes, customer_status_codes
 
 log_dir_path = "data/logs/"
@@ -91,6 +91,9 @@ class LogAnalyzer(object):
         df["occupancy_rate"] = df.occupied / df.working
         df["cruising_rate"] = (df.cruising + df.assigned) / df.working
         df["working_rate"] = df.working / (df.working + df.offduty)
+        df["reward"] = df.earning \
+                       - (df.cruising + df.assigned + df.occupied) * DRIVING_COST \
+                       - df.working * WORKING_COST
         return df
 
     def get_customer_status(self, customer_df, bin_width=300):

@@ -48,10 +48,8 @@ class DeepQNetwork(object):
             })[:, 0]
         return q
 
-    def get_action(self, q_values):
-        amax = np.argmax(q_values)
-        # to make less requests to OSRM
-        if amax != 0 and FLAGS.alpha > 0:
+    def get_action(self, q_values, amax):
+        if FLAGS.alpha > 0:
             exp_q = np.exp((q_values - q_values[amax]) / FLAGS.alpha)
             p = exp_q / exp_q.sum()
             return np.random.choice(len(p), p=p)
@@ -93,12 +91,12 @@ class FittingDeepQNetwork(DeepQNetwork):
         self.summary_writer = tf.summary.FileWriter(FLAGS.save_summary_dir, self.sess.graph)
 
 
-    def get_action(self, q_values):
+    def get_action(self, q_values, amax):
         # e-greedy exploration
         if self.epsilon > np.random.random():
             return np.random.randint(len(q_values))
         else:
-            return super().get_action(q_values)
+            return super().get_action(q_values, amax)
 
     def get_fingerprint(self):
         return self.n_steps, self.epsilon
