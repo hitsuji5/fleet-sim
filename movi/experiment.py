@@ -41,7 +41,7 @@ class Experiment(object):
         sim_logger.log_summary(summary)
 
         if verbose:
-            print(summary)
+            print("summary: ({})".format(summary), flush=True)
 
     def dry_run(self, n_steps):
         for _ in range(n_steps):
