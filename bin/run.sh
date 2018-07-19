@@ -1,0 +1,1 @@
+python movi/run.py --train --tag test --use_osrm

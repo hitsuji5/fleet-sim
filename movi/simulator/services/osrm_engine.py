@@ -2,7 +2,7 @@
 
 import polyline
 from .async_requester import AsyncRequester
-from config.settings import OSRM_ENDPOINT
+from config.settings import OSRM_HOSTPORT
 from common.mesh import convert_xy_to_lonlat
 
 class OSRMEngine(object):
@@ -91,7 +91,7 @@ class OSRMEngine(object):
     def get_route_url(cls, from_latlon, to_latlon):
         """Get URL for osrm backend call for arbitrary to/from latlong pairs"""
         urlholder = """{pfix}/route/v1/driving/{lon0},{lat0};{lon1},{lat1}?overview=full""".format(
-            pfix=OSRM_ENDPOINT,
+            pfix=OSRM_HOSTPORT,
             lon0=from_latlon[1],
             lat0=from_latlon[0],
             lon1=to_latlon[1],
@@ -102,7 +102,7 @@ class OSRMEngine(object):
 
     def get_nearest_url(cls, latlon):
         urlholder = """{pfix}/nearest/v1/driving/{lon},{lat}?number=1""".format(
-            pfix=OSRM_ENDPOINT,
+            pfix=OSRM_HOSTPORT,
             lon=latlon[1],
             lat=latlon[0]
             )
@@ -110,14 +110,14 @@ class OSRMEngine(object):
 
     def get_eta_one_to_many_url(cls, latlon_list):
         urlholder = """{pfix}/table/v1/driving/polyline({coords})?sources=0""".format(
-            pfix=OSRM_ENDPOINT,
+            pfix=OSRM_HOSTPORT,
             coords=polyline.encode(latlon_list, 5)
         )
         return urlholder
 
     def get_eta_many_to_one_url(cls, latlon_list):
         urlholder = """{pfix}/table/v1/driving/polyline({coords})?destinations={last_idx}""".format(
-            pfix=OSRM_ENDPOINT,
+            pfix=OSRM_HOSTPORT,
             coords=polyline.encode(latlon_list, 5),
             last_idx=len(latlon_list) - 1
         )
@@ -127,7 +127,7 @@ class OSRMEngine(object):
         latlon_list = from_latlon_list + to_latlon_list
         ids = range(len(latlon_list))
         urlholder = """{pfix}/table/v1/driving/polyline({coords})?sources={sources}&destinations={destins}""".format(
-            pfix=OSRM_ENDPOINT,
+            pfix=OSRM_HOSTPORT,
             coords=polyline.encode(latlon_list, 5),
             sources=';'.join(map(str, ids[:len(from_latlon_list)])),
             destins=';'.join(map(str, ids[len(from_latlon_list):]))

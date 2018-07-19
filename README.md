@@ -33,26 +33,19 @@ python movi/preprocessing/create_backlog.py trip_records/trips_2016-05.csv
 python movi/preprocessing/create_prediction.py
 ```
 
-### 6. Create Mesh Map
+### 6. Create Trip Time Map
 ```commandline
 python movi/preprocessing/create_tt_map.py ./data
 ```
 
 
-## Run Simulation
-### 1. Run OSRM container
+## Quick Start
+### 1. Build Simulator Image
 ```commandline
-cd osrm
-docker run -t -i -p 5000:5000 -v $(pwd):/data osrm/osrm-backend osrm-routed --algorithm mld /data/NewYork.osrm
+docker-compose build sim
 ```
 
-### 2. Training
+### 2. Run Simulation
 ```commandline
-sh bin/train.sh
-```
-
-
-### 3. Evaluation
-```commandline
-sh bin/eval.sh
+docker-compose up -d
 ```

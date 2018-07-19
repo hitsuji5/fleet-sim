@@ -4,7 +4,7 @@ import os
 
 import argparse
 from experiment import Experiment
-from agent.matching_policy import GreedyMatchingPolicy
+from agent.matching_policy import GreedyMatchingPolicy, RoughMatchingPolicy
 from dqn.dqn_policy import DQNDispatchPolicy, DQNDispatchPolicyLearner
 from dqn.settings import BATCH_SIZE, NUM_ITERATIONS, NUM_SUPPLY_DEMAND_HISTORY, FLAGS
 from config.settings import TIMESTEP, DEFAULT_LOG_DIR
@@ -58,7 +58,12 @@ if __name__ == '__main__':
         dispatch_policy = DQNDispatchPolicy()
         dispatch_policy.build_q_network(load_network=FLAGS.load_network)
 
-    matching_policy = GreedyMatchingPolicy()
+
+    if FLAGS.use_osrm:
+        matching_policy = GreedyMatchingPolicy()
+    else:
+        matching_policy = RoughMatchingPolicy()
+
     dqn_exp = Experiment(start_time, TIMESTEP, dispatch_policy, matching_policy)
     dqn_exp.reset()
     if FLAGS.train:
