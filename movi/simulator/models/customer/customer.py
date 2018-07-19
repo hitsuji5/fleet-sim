@@ -9,10 +9,12 @@ class Customer(object):
         self.waiting_time = 0
 
     def step(self, timestep):
-        if self.status == customer_status_codes.WAITING:
-            self.waiting_time += timestep
-        elif self.status == customer_status_codes.CALLING:
+        if self.status == customer_status_codes.CALLING:
             self.disappear()
+        # if self.status == customer_status_codes.WAITING:
+        #     self.waiting_time += timestep
+        # elif self.status == customer_status_codes.CALLING:
+        #     self.disappear()
 
     def get_id(self):
         customer_id = self.request.id
@@ -33,7 +35,8 @@ class Customer(object):
     def get_request(self):
         return self.request
 
-    def wait_for_vehicle(self):
+    def wait_for_vehicle(self, waiting_time):
+        self.waiting_time = waiting_time
         self.status = customer_status_codes.WAITING
 
     def ride_on(self):

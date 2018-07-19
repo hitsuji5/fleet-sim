@@ -1,8 +1,9 @@
 import os
 
-DB_HOST_PATH = "sqlite:///db.sqlite3"
+DB_HOST_PATH = "sqlite:///data/db.sqlite3"
+OSRM_ENDPOINT = "http://localhost:5000"
 DEFAULT_LOG_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../logs/tmp")
-# DEFAULT_LOG_DIR = "./logs/tmp"
+DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../data")
 
 CENTER_LATITUDE = 40.75
 CENTER_LONGITUDE = -73.90
@@ -11,17 +12,16 @@ LON_WIDTH = 18.0 / 60
 MIN_LAT, MIN_LON = CENTER_LATITUDE - LAT_WIDTH / 2.0, CENTER_LONGITUDE - LON_WIDTH / 2.0
 MAX_LAT, MAX_LON = CENTER_LATITUDE + LAT_WIDTH / 2.0, CENTER_LONGITUDE + LON_WIDTH / 2.0
 BOUNDING_BOX = [[MIN_LAT, MIN_LON], [MAX_LAT, MAX_LON]]
-DELTA_LON = 24.0 / 3600
+DELTA_LON = 21.0 / 3600
 DELTA_LAT = 16.0 / 3600
 MAP_WIDTH = int(LON_WIDTH / DELTA_LON) + 1
 MAP_HEIGHT = int(LAT_WIDTH / DELTA_LAT) + 1
 
-# START_TIME = 1462075200 + 3600 * 4
-# NUM_SIMULATION_DAYS = 7
-# NUM_SIMULATION_STEPS = int(60 * 60 * 24 * NUM_SIMULATION_DAYS / TIMESTEP)
-TIMESTEP = 30
-MIN_UPDATE_CYCLE = 300
-REST_DURATION = 3600
+TIMESTEP = 60
+MIN_DISPATCH_CYCLE = 60 * 7.5
+MAX_DISPATCH_CYCLE = 60 * 10
+GLOBAL_STATE_UPDATE_CYCLE = 60 * 5
+REST_DURATION = 60 * 60
 
 
 # Not in use for now

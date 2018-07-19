@@ -149,7 +149,7 @@ class Vehicle(object):
         self.__route_plan = []
 
     def __set_route(self, route, speed):
-        assert self.get_location() == route[0]
+        # assert self.get_location() == route[0]
         self.__route_plan = route
         self.state.speed = speed
 
