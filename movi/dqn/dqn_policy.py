@@ -3,7 +3,7 @@ import os
 import numpy as np
 from collections import OrderedDict, defaultdict
 from .settings import FLAGS
-from config.settings import GLOBAL_STATE_UPDATE_CYCLE
+from config.settings import GLOBAL_STATE_UPDATE_CYCLE, MIN_DISPATCH_CYCLE
 from .feature_constructor import FeatureConstructor
 from .q_network import DeepQNetwork, FittingDeepQNetwork
 from agent.dispatch_policy import DispatchPolicy
@@ -52,7 +52,7 @@ class DQNDispatchPolicy(DispatchPolicy):
         return commands
 
     def predict_best_action(self, vehicle_id, vehicle_state):
-        if vehicle_state.idle_duration >= 600 and FLAGS.offduty_probability > np.random.random():
+        if vehicle_state.idle_duration >= MIN_DISPATCH_CYCLE and FLAGS.offduty_probability > np.random.random():
             a, offduty = (0, 0), 1
 
         elif self.q_network is None:

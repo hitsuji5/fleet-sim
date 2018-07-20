@@ -55,9 +55,8 @@ class GreedyMatchingPolicy(MatchingPolicy):
     def __init__(self, reject_distance=5000):
         self.reject_distance = reject_distance  # meters
         self.k = 3                              # the number of mesh to aggregate
-        self.unit_length = 500
+        self.unit_length = 500                  # mesh size in meters
         self.max_locations = 40
-        # mesh size in meters
         self.routing_engine = RoutingEngine.create_engine()
 
 
@@ -80,7 +79,7 @@ class GreedyMatchingPolicy(MatchingPolicy):
                     r_2 = dx ** 2 + dy ** 2
                     if r ** 2 <= r_2 and r_2 < (r + 1) ** 2:
                         candidate_vids += V[(x + dx, y + dy)][:]
-                if n_requests <= len(candidate_vids):
+                if len(candidate_vids) > n_requests * 2:
                     break
         return candidate_vids
 
