@@ -55,7 +55,9 @@ class GreedyMatchingPolicy(MatchingPolicy):
     def __init__(self, reject_distance=5000):
         self.reject_distance = reject_distance  # meters
         self.k = 3                              # the number of mesh to aggregate
-        self.unit_length = 500                  # mesh size in meters
+        self.unit_length = 500
+        self.max_locations = 40
+        # mesh size in meters
         self.routing_engine = RoutingEngine.create_engine()
 
 
@@ -69,7 +71,7 @@ class GreedyMatchingPolicy(MatchingPolicy):
                 yield (x, y)
 
 
-    def find_candidates(self, coord, R, V, reject_range):
+    def find_candidates(self, coord, n_requests, V, reject_range):
         x, y = coord
         candidate_vids = V[(x, y)][:]
         for r in range(1, reject_range):
@@ -78,7 +80,7 @@ class GreedyMatchingPolicy(MatchingPolicy):
                     r_2 = dx ** 2 + dy ** 2
                     if r ** 2 <= r_2 and r_2 < (r + 1) ** 2:
                         candidate_vids += V[(x + dx, y + dy)][:]
-                if len(R[(x, y)]) <= len(candidate_vids):
+                if n_requests <= len(candidate_vids):
                     break
         return candidate_vids
 
@@ -134,23 +136,27 @@ class GreedyMatchingPolicy(MatchingPolicy):
         for coord in self.coord_iter():
             if not R[coord]:
                 continue
-            candidate_vids = self.find_candidates(coord, R, V, reject_range)
-            if len(candidate_vids) == 0:
-                continue
 
-            target_latlon = r_latlon.loc[R[coord]]
-            candidate_vids = self.filter_candidates(v_latlon.loc[candidate_vids], target_latlon)
-            if len(candidate_vids) == 0:
-                continue
-            destins = [(lat, lon) for lat, lon in target_latlon.values]
-            candidate_latlon = [(lat, lon) for lat, lon in v_latlon.loc[candidate_vids].values]
-            origins = list(set(candidate_latlon))
-            latlon2oi = {latlon : oi for oi, latlon in enumerate(origins)}
-            T = np.array(self.routing_engine.eta_many_to_many([(origins, destins)])[0], dtype=np.float32)
-            T = T[[latlon2oi[latlon] for latlon in candidate_latlon]]
-            assignments = self.assign_nearest_vehicle(R[coord], candidate_vids, T.T)
-            for vid, rid, tt in assignments:
-                commands.append(self.create_command(vid, rid, tt))
-                V[vid2coord[vid]].remove(vid)
+            for i in range(int(len(R[coord]) / self.max_locations) + 1):
+                target_rids = R[coord][i * self.max_locations : (i + 1) * self.max_locations]
+
+                candidate_vids = self.find_candidates(coord, len(target_rids), V, reject_range)
+                if len(candidate_vids) == 0:
+                    continue
+
+                target_latlon = r_latlon.loc[target_rids]
+                candidate_vids = self.filter_candidates(v_latlon.loc[candidate_vids], target_latlon)
+                if len(candidate_vids) == 0:
+                    continue
+                destins = [(lat, lon) for lat, lon in target_latlon.values]
+                candidate_latlon = [(lat, lon) for lat, lon in v_latlon.loc[candidate_vids].values]
+                origins = list(set(candidate_latlon))
+                latlon2oi = {latlon : oi for oi, latlon in enumerate(origins)}
+                T = np.array(self.routing_engine.eta_many_to_many([(origins, destins)])[0], dtype=np.float32)
+                T = T[[latlon2oi[latlon] for latlon in candidate_latlon]]
+                assignments = self.assign_nearest_vehicle(target_rids, candidate_vids, T.T)
+                for vid, rid, tt in assignments:
+                    commands.append(self.create_command(vid, rid, tt))
+                    V[vid2coord[vid]].remove(vid)
 
         return commands

@@ -7,7 +7,7 @@ from common.mesh import convert_xy_to_lonlat
 
 class OSRMEngine(object):
     """Sends and parses asynchronous requests from list of O-D pairs"""
-    def __init__(self, n_threads=10):
+    def __init__(self, n_threads=8):
         self.async_requester = AsyncRequester(n_threads)
         self.route_cache = {}
 
