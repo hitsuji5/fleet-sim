@@ -155,7 +155,8 @@ class DQNDispatchPolicyLearner(DQNDispatchPolicy):
 
         if len(self.supply_demand_history) > settings.INITIAL_MEMORY_SIZE:
             average_loss, average_q_max = self.train_network(settings.BATCH_SIZE, settings.NUM_ITERATIONS)
-            print("iterations : {}, average_loss : {:.3f}, average_q_max : {:.3f}".format(self.q_network.n_steps, average_loss, average_q_max))
+            print("iterations : {}, average_loss : {:.3f}, average_q_max : {:.3f}".format(
+                self.q_network.n_steps, average_loss, average_q_max), flush=True)
             self.q_network.write_summary(average_loss, average_q_max)
         return commands
 

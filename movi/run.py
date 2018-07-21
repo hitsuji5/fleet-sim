@@ -51,7 +51,8 @@ if __name__ == '__main__':
         if FLAGS.pretrain > 0:
             for i in range(FLAGS.pretrain):
                 average_loss, average_q_max = dispatch_policy.train_network(BATCH_SIZE, NUM_ITERATIONS)
-                print("iterations : {}, average_loss : {:.3f}, average_q_max : {:.3f}".format(i, average_loss, average_q_max), flush=True)
+                print("iterations : {}, average_loss : {:.3f}, average_q_max : {:.3f}".format(
+                    i, average_loss, average_q_max), flush=True)
                 dispatch_policy.q_network.write_summary(average_loss, average_q_max)
 
     else:
