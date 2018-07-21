@@ -34,8 +34,7 @@ if __name__ == '__main__':
 
     num_simulation_steps = int(60 * 60 * 24 * FLAGS.days / TIMESTEP)
     num_vehicles = FLAGS.vehicles
-
-    start_time = FLAGS.start_time + int(60 * 60 * 24 * FLAGS.start_offset / TIMESTEP)
+    start_time = FLAGS.start_time + int(60 * 60 * 24 * FLAGS.start_offset)
     print("Start Datetime: {}".format(get_local_datetime(start_time)))
     end_time = start_time + num_simulation_steps * TIMESTEP
     print("End Datetime  : {}".format(get_local_datetime(end_time)))
