@@ -106,9 +106,8 @@ class FeatureConstructor(object):
         padded_map = np.pad(map, MAX_MOVE, "constant")
         diffused_map = self.construct_initial_map()
         d = MAX_MOVE * 2 + 1
-        for x in range(MAP_WIDTH):
-            for y in range(MAP_HEIGHT):
-                diffused_map[x, y] = (padded_map[x : x + d, y : y + d] * d_filter[x, y]).sum()
+        for x, y in self.state_space:
+            diffused_map[x, y] = (padded_map[x : x + d, y : y + d] * d_filter[x, y]).sum()
         return diffused_map
 
     def update_fingerprint(self, fingerprint):
