@@ -27,7 +27,9 @@ flags.DEFINE_integer('days', 14, "simulation days")
 flags.DEFINE_integer('n_diffusions', 3, "number of diffusion convolution")
 flags.DEFINE_string('tag', 'base', "tag used to identify logs")
 flags.DEFINE_boolean('log_vehicle', False, "whether to log vehicle states")
-flags.DEFINE_boolean('use_osrm', False, "whether to use OSRM")
+flags.DEFINE_boolean('use_osrm', True, "whether to use OSRM")
+flags.DEFINE_boolean('use_dcnn', True, "whether to use diffusion filter or average filter")
+
 
 GAMMA = 0.98  # Discount Factor
 MAX_MOVE = 7

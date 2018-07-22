@@ -5,19 +5,20 @@ from config.settings import MAP_WIDTH, MAP_HEIGHT, DATA_DIR, MIN_DISPATCH_CYCLE
 from .settings import MAX_MOVE, NUM_SUPPLY_DEMAND_MAPS, FLAGS
 from common import vehicle_status_codes, mesh
 
+L = MAX_MOVE * 2 + 1
 
 class FeatureConstructor(object):
 
     def __init__(self):
         self.t = 0
         self.fingerprint = (100000, 0)
-        # self.action_space = [(0, 0)] + [(ax, ay) for ax in range(-MAX_MOVE, MAX_MOVE + 1)
-        #                                 for ay in range(-MAX_MOVE, MAX_MOVE + 1)
-        #                                 if ax ** 2 + ay ** 2 >= 1]
         self.reachable_map = self.load_reachable_map()
         self.state_space = [(x, y) for x in range(MAP_WIDTH) for y in range(MAP_HEIGHT) if self.reachable_map[x, y] == 1]
         self.tt_map = self.load_tt_map()
-        self.D_out, self.D_in = self.build_diffusion_filter()
+        if FLAGS.use_dcnn:
+            self.D_out, self.D_in = self.build_diffusion_filter()
+        else:
+            self.D_out = self.D_in = np.ones(MAP_WIDTH, MAP_HEIGHT) / (L ** 2)
         self.d_entropy = self.build_diffusion_entropy_map()
 
 
@@ -32,36 +33,18 @@ class FeatureConstructor(object):
                 if self.is_reachable(x_, y_):
                     yield (ax, ay)
 
-
     def load_reachable_map(self):
         return np.load(os.path.join(DATA_DIR, 'reachable_map.npy'))
 
-        # if FLAGS.use_osrm:
-        #     return np.load(os.path.join(DATA_DIR, 'reachable_map.npy'))
-        # return np.ones((MAP_WIDTH, MAP_HEIGHT))
-
     def load_tt_map(self):
         return np.load(os.path.join(DATA_DIR, 'tt_map.npy')) / MIN_DISPATCH_CYCLE / 2.0
-
-        # if FLAGS.use_osrm:
-        #     return np.load(os.path.join(DATA_DIR, 'tt_map.npy')) / MAX_DISPATCH_CYCLE
-        #
-        # n = MAX_MOVE * 2 + 1
-        # tt_map = np.ones((MAP_WIDTH, MAP_HEIGHT, n, n)) * float('inf')
-        #
-        # for x, y in self.state_space:
-        #     for ax, ay in self.action_space_iter(x, y):
-        #         axi, ayi = MAX_MOVE + ax, MAX_MOVE + ay
-        #         tt_map[x, y, axi, ayi] = np.sqrt(ax ** 2 + ay ** 2) / (MAX_MOVE + 1)
-        # return tt_map
 
     def build_diffusion_filter(self):
         D_out = np.exp(-self.tt_map * 2)
         for x, y in self.state_space:
             D_out[x, y] /= D_out[x, y].sum()
 
-        n = MAX_MOVE * 2 + 1
-        D_in = np.zeros((MAP_WIDTH, MAP_HEIGHT, n, n))
+        D_in = np.zeros((MAP_WIDTH, MAP_HEIGHT, L, L))
         for x, y in self.state_space:
             for ax, ay in self.action_space_iter(x, y):
                 axi, ayi = MAX_MOVE + ax, MAX_MOVE + ay
@@ -73,7 +56,7 @@ class FeatureConstructor(object):
         entropy = np.zeros((MAP_WIDTH, MAP_HEIGHT))
         for x, y in self.state_space:
             entropy[x, y] = -(self.D_out[x, y] * np.log(self.D_out[x, y] + 1e-6)).sum()
-        entropy /= np.log((MAX_MOVE * 2 + 1) ** 2 + 1e-6)
+        entropy /= np.log(L ** 2 + 1e-6)
         diffused_entropy = [entropy] + self.diffusion_convolution(entropy, self.D_out, FLAGS.n_diffusions - 1)
         return diffused_entropy
 
@@ -105,9 +88,8 @@ class FeatureConstructor(object):
     def diffuse_map(self, map, d_filter):
         padded_map = np.pad(map, MAX_MOVE, "constant")
         diffused_map = self.construct_initial_map()
-        d = MAX_MOVE * 2 + 1
         for x, y in self.state_space:
-            diffused_map[x, y] = (padded_map[x : x + d, y : y + d] * d_filter[x, y]).sum()
+            diffused_map[x, y] = (padded_map[x : x + L, y : y + L] * d_filter[x, y]).sum()
         return diffused_map
 
     def update_fingerprint(self, fingerprint):

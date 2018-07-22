@@ -56,7 +56,8 @@ if __name__ == '__main__':
 
     else:
         dispatch_policy = DQNDispatchPolicy()
-        dispatch_policy.build_q_network(load_network=FLAGS.load_network)
+        if FLAGS.load_network:
+            dispatch_policy.build_q_network(load_network=FLAGS.load_network)
 
 
     if FLAGS.use_osrm:
