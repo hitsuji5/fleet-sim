@@ -54,6 +54,7 @@ class RoughMatchingPolicy(MatchingPolicy):
 class GreedyMatchingPolicy(MatchingPolicy):
     def __init__(self, reject_distance=5000):
         self.reject_distance = reject_distance  # meters
+        self.reject_wait_time = 15 * 60         # seconds
         self.k = 3                              # the number of mesh to aggregate
         self.unit_length = 500                  # mesh size in meters
         self.max_locations = 40
@@ -86,10 +87,12 @@ class GreedyMatchingPolicy(MatchingPolicy):
     def assign_nearest_vehicle(self, request_ids, vehicle_ids, T):
         assignments = []
         for ri, rid in enumerate(request_ids):
-            if ri >= len(vehicle_ids):
+            if len(assignments) >= len(vehicle_ids):
                 break
 
             vi = T[ri].argmin()
+            if T[ri, vi] > self.reject_wait_time:
+                continue
             vid = vehicle_ids[vi]
             assignments.append((vid, rid, T[ri, vi]))
             T[:, vi] = float('inf')
