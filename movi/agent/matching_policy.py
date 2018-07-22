@@ -91,10 +91,11 @@ class GreedyMatchingPolicy(MatchingPolicy):
                 break
 
             vi = T[ri].argmin()
-            if T[ri, vi] > self.reject_wait_time:
+            tt = T[ri, vi]
+            if tt > self.reject_wait_time:
                 continue
             vid = vehicle_ids[vi]
-            assignments.append((vid, rid, T[ri, vi]))
+            assignments.append((vid, rid, tt))
             T[:, vi] = float('inf')
         return assignments
 
@@ -150,15 +151,22 @@ class GreedyMatchingPolicy(MatchingPolicy):
                 candidate_vids = self.filter_candidates(v_latlon.loc[candidate_vids], target_latlon)
                 if len(candidate_vids) == 0:
                     continue
-                destins = [(lat, lon) for lat, lon in target_latlon.values]
-                candidate_latlon = [(lat, lon) for lat, lon in v_latlon.loc[candidate_vids].values]
-                origins = list(set(candidate_latlon))
-                latlon2oi = {latlon : oi for oi, latlon in enumerate(origins)}
-                T = np.array(self.routing_engine.eta_many_to_many([(origins, destins)])[0], dtype=np.float32)
-                T = T[[latlon2oi[latlon] for latlon in candidate_latlon]]
+                candidate_latlon = v_latlon.loc[candidate_vids]
+                T = self.eta_matrix(candidate_latlon, target_latlon)
                 assignments = self.assign_nearest_vehicle(target_rids, candidate_vids, T.T)
                 for vid, rid, tt in assignments:
                     commands.append(self.create_command(vid, rid, tt))
                     V[vid2coord[vid]].remove(vid)
 
         return commands
+
+
+    def eta_matrix(self, origins_array, destins_array):
+        destins = [(lat, lon) for lat, lon in destins_array.values]
+        origins = [(lat, lon) for lat, lon in origins_array.values]
+        origin_set = list(set(origins))
+        latlon2oi = {latlon: oi for oi, latlon in enumerate(origin_set)}
+        T = np.array(self.routing_engine.eta_many_to_many([(origin_set, destins)])[0], dtype=np.float32)
+        T[np.isnan(T)] = float('inf')
+        T = T[[latlon2oi[latlon] for latlon in origins]]
+        return T

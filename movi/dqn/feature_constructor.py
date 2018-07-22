@@ -15,10 +15,11 @@ class FeatureConstructor(object):
         self.reachable_map = self.load_reachable_map()
         self.state_space = [(x, y) for x in range(MAP_WIDTH) for y in range(MAP_HEIGHT) if self.reachable_map[x, y] == 1]
         self.tt_map = self.load_tt_map()
-        if FLAGS.use_dcnn:
-            self.D_out, self.D_in = self.build_diffusion_filter()
-        else:
+        if FLAGS.use_average:
             self.D_out = self.D_in = np.ones(MAP_WIDTH, MAP_HEIGHT) / (L ** 2)
+        else:
+            self.D_out, self.D_in = self.build_diffusion_filter()
+
         self.d_entropy = self.build_diffusion_entropy_map()
 
 
