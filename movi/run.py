@@ -82,7 +82,7 @@ if __name__ == '__main__':
         if i % int(3600 / TIMESTEP) == 0:
             print("Elapsed : {:.0f} hours".format(i * TIMESTEP / 3600.0), flush=True)
 
-        if i % epoch == 0:
+        if i % epoch == epoch - 1:
             dqn_exp.simulator.log_score()
 
         if FLAGS.train and (i % (epoch * 7) == 0 or i == num_simulation_steps - 1):
