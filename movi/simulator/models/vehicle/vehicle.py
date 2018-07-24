@@ -32,7 +32,6 @@ class Vehicle(object):
             self.state.idle_duration += timestep
         else:
             self.state.idle_duration = 0
-        self.duration[self.state.status] += 1
 
         try:
             self.__behavior.step(self, timestep)
@@ -47,7 +46,7 @@ class Vehicle(object):
         self.__set_route(route, speed)
         self.__set_destination(route[-1], triptime)
         self.__change_to_cruising()
-        self.__log()
+        self.__log(triptime)
 
     def head_for_customer(self, destination, triptime, customer_id):
         assert self.__behavior.available
@@ -55,15 +54,16 @@ class Vehicle(object):
         self.__set_destination(destination, triptime)
         self.state.assigned_customer_id = customer_id
         self.__change_to_assigned()
-        self.__log()
+        self.__log(triptime)
 
     def take_rest(self, duration):
         assert self.__behavior.available
         self.__reset_plan()
         self.state.idle_duration = 0
-        self.__set_destination(self.get_location(), np.random.randint(duration / 2, duration * 3 / 2))
+        offtime = np.random.randint(duration / 2, duration * 3 / 2)
+        self.__set_destination(self.get_location(), offtime)
         self.__change_to_off_duty()
-        self.__log()
+        self.__log(offtime)
 
     def pickup(self, customer):
         assert self.get_location() == customer.get_origin()
@@ -72,9 +72,10 @@ class Vehicle(object):
         self.__customers.append(customer)
         self.__reset_plan() # For now we don't consider routes of occupied trip
         self.state.assigned_customer_id = customer_id
-        self.__set_destination(customer.get_destination(), customer.get_trip_duration())
+        triptime = customer.get_trip_duration()
+        self.__set_destination(customer.get_destination(), triptime)
         self.__change_to_occupied()
-        self.__log()
+        self.__log(triptime)
 
     def dropoff(self):
         assert len(self.__customers) > 0
@@ -177,6 +178,7 @@ class Vehicle(object):
         self.__behavior = self.behavior_models[status]
         self.state.status = status
 
-    def __log(self):
+    def __log(self, duration=0):
+        self.duration[self.state.status] += duration
         if FLAGS.log_vehicle:
             sim_logger.log_vehicle_event(self.state.to_msg())
