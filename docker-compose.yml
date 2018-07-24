@@ -20,5 +20,5 @@ services:
       - ./osrm:/data
     ports:
       - "5000:5000"
-    command: osrm-routed --algorithm mld /data/NewYork.osrm
+    command: osrm-routed --algorithm mld --verbosity error /data/NewYork.osrm
 
