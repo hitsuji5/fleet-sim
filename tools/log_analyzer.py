@@ -84,15 +84,16 @@ class LogAnalyzer(object):
 
     def load_score_log(self, log_dir_path, max_num=100, skip_minutes=0):
         df = self.load_log(log_dir_path + score_log_file, score_log_cols, max_num, skip_minutes)
-        df["t"] = (df.t - df.t.min()) / 3600
+        # df["t"] = (df.t - df.t.min()) / 3600
+        total_seconds = (df.t.max() - df.t.min() + 3600 * 24)
         df = df[df.t == df.t.max()]
-        df["working"] = df.occupied + df.idle + df.cruising + df.assigned
+        df["working"] = total_seconds - df.offduty
         df["occupancy_rate"] = df.occupied / df.working
         df["cruising_rate"] = (df.cruising + df.assigned) / df.working
         df["working_rate"] = df.working / (df.working + df.offduty)
         df["reward"] = df.earning \
-                       - (df.cruising + df.assigned + df.occupied) * DRIVING_COST \
-                       - df.working * WORKING_COST
+                       - (df.cruising + df.assigned + df.occupied) * DRIVING_COST / settings.TIMESTEP \
+                       - df.working * WORKING_COST / settings.TIMESTEP
         return df
 
     def get_customer_status(self, customer_df, bin_width=300):
@@ -173,10 +174,10 @@ class LogAnalyzer(object):
             x = {}
             x["0_reject_rate"] = float(len(c[c.status == 4])) / len(c)
             x["1_occupancy_rate"] = (score.occupied / score.working).mean()
-            x["2_revenue/hour"] = float(score.earning.sum()) / score.working.sum() * (3600 / settings.TIMESTEP)
-            x["3_working/day"] = float(score.working.sum()) / n_days / len(score) / (3600 / settings.TIMESTEP)
+            x["2_revenue/hour"] = float(score.earning.sum()) / score.working.sum() * 3600
+            x["3_working/day"] = float(score.working.sum()) / n_days / len(score) / 3600
             x["4_cruising/day"] = (score.cruising + score.assigned).sum() / n_days / len(score) / (
-            3600 / settings.TIMESTEP)
+            3600)
             x["5_waiting_time"] = c[c.status == 2].waiting_time.mean()
             data.append(x)
 
