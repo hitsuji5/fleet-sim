@@ -1,6 +1,6 @@
 # from config.settings import MAP_WIDTH, MAP_HEIGHT
 from common import vehicle_status_codes
-from config.settings import DEFAULT_LOG_DIR
+from config.settings import DEFAULT_LOG_DIR, GLOBAL_STATE_UPDATE_CYCLE
 import os
 import tensorflow as tf
 
@@ -50,13 +50,14 @@ STATE_REWARD_TABLE = {
 WAIT_ACTION_PROBABILITY = 0.70  # wait action probability in epsilon-greedy
 EXPLORATION_STEPS = 5000  # Number of steps over which the initial value of epsilon is linearly annealed to its final value
 INITIAL_EPSILON = 1.0  # Initial value of epsilon in epsilon-greedy
-FINAL_EPSILON = 0.05  # Final value of epsilon in epsilon-greedy
+FINAL_EPSILON = 0.01  # Final value of epsilon in epsilon-greedy
 INITIAL_MEMORY_SIZE = 100  # Number of steps to populate the replay memory before training starts
-NUM_SUPPLY_DEMAND_HISTORY = 10000
+# NUM_SUPPLY_DEMAND_HISTORY = 10000
+NUM_SUPPLY_DEMAND_HISTORY = 7 * 24 * 3600 / GLOBAL_STATE_UPDATE_CYCLE + 1 # = 1 week
 MAX_MEMORY_SIZE = 10000000  # Number of replay memory the agent uses for training
 SAVE_INTERVAL = 1000  # The frequency with which the network is saved
-BATCH_SIZE = 64  # Mini batch size
-NUM_ITERATIONS = 2 # Number of batches
+BATCH_SIZE = 128  # Mini batch size
+NUM_ITERATIONS = 1 # Number of batches
 TARGET_UPDATE_INTERVAL = 50  # The frequency with which the target network is updated
 LEARNING_RATE = 0.00025  # Learning rate used by RMSProp
 MOMENTUM = 0.95  # Momentum used by RMSProp
