@@ -84,7 +84,6 @@ class LogAnalyzer(object):
 
     def load_score_log(self, log_dir_path, max_num=100, skip_minutes=0):
         df = self.load_log(log_dir_path + score_log_file, score_log_cols, max_num, skip_minutes)
-        # df["t"] = (df.t - df.t.min()) / 3600
         total_seconds = (df.t.max() - df.t.min() + 3600 * 24)
         df = df[df.t == df.t.max()]
         df["working"] = total_seconds - df.offduty
@@ -141,35 +140,34 @@ class LogAnalyzer(object):
             c = self.load_customer_log(p)
 
             plt.subplot(231)
-            plt.title("revenue")
-            plt.hist(score.earning, bins=100, alpha=0.3, label=label)
+            plt.title("revenue/hour")
+            plt.hist(score.earning / score.working * 3600, bins=100, range=(10, 50), alpha=0.3, label=label)
             plt.yticks([])
 
             plt.subplot(232)
             plt.title("working rate")
-            plt.hist(score.working_rate, bins=100, alpha=0.3, label=label)
+            plt.hist(score.working_rate, bins=100, range=(0, 1), alpha=0.3, label=label)
             plt.yticks([])
 
             plt.subplot(233)
             plt.title("cruising rate")
-            plt.hist(score.cruising_rate, bins=100, alpha=0.3, label=label)
+            plt.hist(score.cruising_rate, bins=100, range=(0, 1), alpha=0.3, label=label)
             plt.yticks([])
 
             plt.subplot(234)
             plt.title("occupancy rate")
-            plt.hist(score.occupancy_rate, bins=100, alpha=0.3, label=label)
+            plt.hist(score.occupancy_rate, bins=100, range=(0, 1), alpha=0.3, label=label)
             plt.yticks([])
 
             plt.subplot(235)
-            plt.title("total reward")
-            plt.hist(score.reward, bins=100, alpha=0.3, label=label)
+            plt.title("total reward / day")
+            plt.hist(score.reward / n_days, bins=100, range=(-100, 500), alpha=0.3, label=label)
             plt.yticks([])
 
             plt.subplot(236)
             plt.title("waiting time")
-            plt.hist(c[c.status==2].waiting_time, bins=500, alpha=0.3, label=label)
+            plt.hist(c[c.status==2].waiting_time, bins=500, range=(0, 650), alpha=0.3, label=label)
             plt.yticks([])
-            plt.xlim([0, 650])
 
             x = {}
             x["0_reject_rate"] = float(len(c[c.status == 4])) / len(c)
