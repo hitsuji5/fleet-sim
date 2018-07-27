@@ -52,7 +52,6 @@ EXPLORATION_STEPS = 5000  # Number of steps over which the initial value of epsi
 INITIAL_EPSILON = 1.0  # Initial value of epsilon in epsilon-greedy
 FINAL_EPSILON = 0.01  # Final value of epsilon in epsilon-greedy
 INITIAL_MEMORY_SIZE = 100  # Number of steps to populate the replay memory before training starts
-# NUM_SUPPLY_DEMAND_HISTORY = 10000
 NUM_SUPPLY_DEMAND_HISTORY = 7 * 24 * 3600 / GLOBAL_STATE_UPDATE_CYCLE + 1 # = 1 week
 MAX_MEMORY_SIZE = 10000000  # Number of replay memory the agent uses for training
 SAVE_INTERVAL = 1000  # The frequency with which the network is saved

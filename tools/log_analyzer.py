@@ -129,7 +129,7 @@ class LogAnalyzer(object):
         plt.legend()
 
         plt.subplot(313)
-        plt.plot(summary.t, summary.n_matching / summary.n_requests, alpha=1.0)
+        plt.plot(summary.t, summary.average_wt, alpha=1.0)
         return plt
 
     def plot_metrics(self, paths, labels, n_days, plt):
