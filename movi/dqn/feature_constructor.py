@@ -41,7 +41,7 @@ class FeatureConstructor(object):
         return np.load(os.path.join(DATA_DIR, 'tt_map.npy')) / MIN_DISPATCH_CYCLE / 2.0
 
     def build_diffusion_filter(self):
-        D_out = np.exp(-(self.tt_map * 2) ** 2)
+        D_out = np.exp(-(self.tt_map) ** 2)
         for x, y in self.state_space:
             D_out[x, y] /= D_out[x, y].sum()
 
@@ -49,7 +49,7 @@ class FeatureConstructor(object):
         for x, y in self.state_space:
             for ax, ay in self.action_space_iter(x, y):
                 axi, ayi = MAX_MOVE + ax, MAX_MOVE + ay
-                D_in[x, y, axi, ayi] = D_out[x + ax, y + ay, -axi, -ayi]
+                D_in[x, y, axi, ayi] = D_out[x + ax, y + ay, -axi-1, -ayi-1]
         return D_out, D_in
 
 

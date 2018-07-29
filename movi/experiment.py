@@ -34,7 +34,10 @@ class Experiment(object):
         self.simulator.dispatch_vehicles(d_commands)
 
         net_v = vehicles[vehicles.status != vehicle_status_codes.OFF_DUTY]
-        average_wt = np.mean([command['duration'] for command in m_commands]).astype(int)
+        if len(m_commands) > 0:
+            average_wt = np.mean([command['duration'] for command in m_commands]).astype(int)
+        else:
+            average_wt = 0
         summary = "{:d}, {:d}, {:d}, {:d}, {:d}, {:d}, {:d}".format(
             current_time, len(net_v), len(net_v[net_v.status == vehicle_status_codes.OCCUPIED]),
             len(requests), len(m_commands), len(d_commands), average_wt

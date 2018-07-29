@@ -51,7 +51,7 @@ def create_tt_map(engine, reachable_map):
             x_, y_ = x + ax, y + ay
             axi, ayi = ax + MAX_MOVE, ay + MAX_MOVE
             if x_ < 0 or x_ >= MAP_WIDTH or y_ < 0 or y_ >= MAP_HEIGHT \
-                    or reachable_map[x_, y_] == 0 or tt_map[x, y, ax + MAX_MOVE, ay + MAX_MOVE] == 0:
+                    or reachable_map[x_, y_] == 0 or tt_map[x, y, axi, ayi] == 0:
                 tt_map[x, y, axi, ayi] = float('inf')
         if reachable_map[x, y] == 1:
             tt_map[x, y, MAX_MOVE, MAX_MOVE] = 0

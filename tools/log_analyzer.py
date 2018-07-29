@@ -141,22 +141,22 @@ class LogAnalyzer(object):
 
             plt.subplot(231)
             plt.title("revenue/hour")
-            plt.hist(score.earning / score.working * 3600, bins=100, range=(10, 50), alpha=0.3, label=label)
+            plt.hist(score.earning / score.working * 3600, bins=100, range=(25, 45), alpha=0.3, label=label)
             plt.yticks([])
 
             plt.subplot(232)
             plt.title("working rate")
-            plt.hist(score.working_rate, bins=100, range=(0, 1), alpha=0.3, label=label)
+            plt.hist(score.working_rate, bins=100, range=(0.6, 1), alpha=0.3, label=label)
             plt.yticks([])
 
             plt.subplot(233)
             plt.title("cruising rate")
-            plt.hist(score.cruising_rate, bins=100, range=(0, 1), alpha=0.3, label=label)
+            plt.hist(score.cruising_rate, bins=100, range=(0, 0.4), alpha=0.3, label=label)
             plt.yticks([])
 
             plt.subplot(234)
             plt.title("occupancy rate")
-            plt.hist(score.occupancy_rate, bins=100, range=(0, 1), alpha=0.3, label=label)
+            plt.hist(score.occupancy_rate, bins=100, range=(0.4, 0.8), alpha=0.3, label=label)
             plt.yticks([])
 
             plt.subplot(235)
