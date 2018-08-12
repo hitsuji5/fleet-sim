@@ -1,4 +1,4 @@
-# MOVI: Fleet Management Simulation Framework
+# D2C-Net: Distributed Diffusive Control Network
 
 ## Setup
 
@@ -28,14 +28,14 @@ wget https://s3.amazonaws.com/nyc-tlc/trip+data/green_tripdata_2016-05.csv -P tr
 
 ### 5. Preprocess Trip Data
 ```commandline
-python movi/preprocessing/preprocess_nyc_dataset.py trip_records/ --month 2016-05
-python movi/preprocessing/create_backlog.py trip_records/trips_2016-05.csv
-python movi/preprocessing/create_prediction.py
+python src/preprocessing/preprocess_nyc_dataset.py trip_records/ --month 2016-05
+python src/preprocessing/create_backlog.py trip_records/trips_2016-05.csv
+python src/preprocessing/create_prediction.py
 ```
 
 ### 6. Create Trip Time Map
 ```commandline
-python movi/preprocessing/create_tt_map.py ./data
+python src/preprocessing/create_tt_map.py ./data
 ```
 
 

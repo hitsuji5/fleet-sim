@@ -1,7 +1,7 @@
 import pandas as pd
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/../movi/')
+sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/../src/')
 from dqn.settings import WORKING_COST, DRIVING_COST
 from common import time_utils, vehicle_status_codes, customer_status_codes
 from config import settings
@@ -82,17 +82,22 @@ class LogAnalyzer(object):
     def load_summary_log(self, log_dir_path, max_num=100, skip_minutes=0):
         return self.load_log(log_dir_path + summary_log_file, summary_log_cols, max_num, skip_minutes)
 
+    def _load_score_log(self, log_dir_path, max_num=100, skip_minutes=0):
+        return self.load_log(log_dir_path + score_log_file, score_log_cols, max_num, skip_minutes)
+
     def load_score_log(self, log_dir_path, max_num=100, skip_minutes=0):
-        df = self.load_log(log_dir_path + score_log_file, score_log_cols, max_num, skip_minutes)
+        df = self._load_score_log(log_dir_path, max_num, skip_minutes)
         total_seconds = (df.t.max() - df.t.min() + 3600 * 24)
+        n_days = total_seconds / 3600 / 24
         df = df[df.t == df.t.max()]
-        df["working"] = total_seconds - df.offduty
-        df["occupancy_rate"] = df.occupied / df.working
-        df["cruising_rate"] = (df.cruising + df.assigned) / (df.occupied + df.cruising + df.assigned)
-        df["working_rate"] = df.working / (df.working + df.offduty)
-        df["reward"] = df.earning \
-                       - (df.cruising + df.assigned + df.occupied) * DRIVING_COST / settings.TIMESTEP \
-                       - df.working * WORKING_COST / settings.TIMESTEP
+        df["working_hour"] = (total_seconds - df.offduty) / n_days / 3600
+        df["cruising_hour"] = (df.cruising + df.assigned) / n_days / 3600
+        df["occupancy_rate"] = df.occupied / (df.working_hour * n_days * 3600) * 100
+        df["reward"] = (df.earning
+                       - (df.cruising + df.assigned + df.occupied) * DRIVING_COST / settings.TIMESTEP
+                       - (total_seconds - df.offduty) * WORKING_COST / settings.TIMESTEP) / n_days
+        df["revenue_per_hour"] = df.earning / df.working_hour / n_days
+
         return df
 
     def get_customer_status(self, customer_df, bin_width=300):
@@ -114,75 +119,89 @@ class LogAnalyzer(object):
         return ((df.t - start_time) / bin_width).astype(int) * int(bin_width) + start_time
 
 
-    def plot_summary(self, path, plt):
-        summary = self.load_summary_log(path)
-        summary.t = [time_utils.get_local_datetime(t) for t in summary.t]
-        plt.figure(figsize=(12, 6))
-        plt.subplot(311)
-        plt.plot(summary.t, summary.n_requests, label="request", alpha=0.7)
-        plt.plot(summary.t, summary.n_requests - summary.n_matching, label="reject", alpha=0.7)
-        # plt.plot(summary.t, summary.n_dispatch, label="dispatch", alpha=0.7)
-        plt.ylabel("count/minute")
-        plt.ylim([0, 700])
-        plt.legend()
-        plt.subplot(312)
-        plt.plot(summary.t, summary.n_vehicles, label="working vehicles")
-        plt.plot(summary.t, summary.occupied_vehicles, label="occupied vehicles")
-        plt.ylabel("# of vehicles")
-        plt.legend()
-
-        plt.subplot(313)
-        plt.plot(summary.t, summary.average_wt, alpha=1.0)
-        plt.ylim([0, 650])
-        plt.ylabel("waiting time (s)")
-        plt.xlabel("simulation time (s)")
+    def plot_summary(self, paths, labels, plt):
+        plt.figure(figsize=(8, 5))
+        plt.subplots_adjust(wspace=0.2, hspace=0.4)
+        for i, path in enumerate(paths):
+            summary = self.load_summary_log(path)
+            summary['t'] = (summary.t / 3600).astype(int) * 3600
+            summary = summary.groupby('t').mean().reset_index()
+            summary.t = [time_utils.get_local_datetime(t) for t in summary.t]
+            # plt.subplot(211)
+            # plt.plot(summary.t, summary.n_requests, label="request")
+            # plt.plot(summary.t, summary.n_requests - summary.n_matching, label="reject", linestyle=':')
+            # # # plt.plot(summary.t, summary.n_dispatch, label="dispatch", alpha=0.7)
+            # plt.ylabel("count/minute")
+            # plt.ylim([0, 540])
+            # plt.legend()
+            plt.subplot(len(paths), 1, 1+i)
+            plt.title(labels[i])
+            plt.plot(summary.t, summary.n_vehicles, label="working")
+            plt.plot(summary.t, summary.occupied_vehicles, label="occupied", linestyle=':')
+            plt.ylabel("# of vehicles")
+            plt.ylim([0, 10100])
+            if i != len(paths) - 1:
+                plt.xticks([])
+            if i == 0:
+                plt.legend(loc='upper right')
+                # plt.subplot(313)
+            # plt.plot(summary.t, summary.average_wt, alpha=1.0)
+            # plt.ylim([0, 450])
+            # plt.ylabel("waiting time (s)")
+            # plt.xlabel("simulation time (s)")
         return plt
 
-    def plot_metrics(self, paths, labels, n_days, plt):
+    def plot_metrics(self, paths, labels, plt):
         data = []
-        plt.figure(figsize=(12, 5))
+        plt.figure(figsize=(8, 4))
         plt.subplots_adjust(wspace=0.2, hspace=0.4)
         for p, label in zip(paths, labels):
             score = self.load_score_log(p)
             c = self.load_customer_log(p)
 
-            plt.subplot(231)
-            plt.xlabel("revenue (dollar/hour)")
-            plt.hist(score.earning / score.working * 3600, bins=100, range=(28, 42), alpha=0.3, label=label)
+            plt.subplot(221)
+            plt.xlabel("revenue ($/h)")
+            plt.hist(score.revenue_per_hour, bins=100, range=(28, 42), alpha=0.5, label=label)
             plt.yticks([])
 
-            plt.subplot(232)
-            plt.xlabel("working time (hour/day)")
-            plt.hist(score.working / n_days / 3600, bins=100, range=(17, 23), alpha=0.3, label=label)
+            plt.subplot(222)
+            plt.xlabel("working time (h/day)")
+            plt.hist(score.working_hour, bins=100, range=(17, 23), alpha=0.5, label=label)
             plt.yticks([])
 
-            plt.subplot(233)
-            plt.xlabel("cruising rate")
-            plt.hist(score.cruising_rate, bins=100, range=(0.15, 0.35), alpha=0.3, label=label)
+            plt.subplot(223)
+            plt.xlabel("cruising time (h/day)")
+            plt.hist(score.cruising_hour, bins=100, range=(2.5, 5.5), alpha=0.5, label=label)
             plt.yticks([])
 
-            plt.subplot(234)
-            plt.xlabel("occupancy rate")
-            plt.hist(score.occupancy_rate, bins=100, range=(0.55, 0.75), alpha=0.3, label=label)
-            plt.yticks([])
+            # plt.subplot(234)
+            # plt.xlabel("occupancy rate")
+            # plt.hist(score.occupancy_rate, bins=100, range=(55, 75), alpha=0.5, label=label)
+            # plt.yticks([])
+            #
+            # plt.subplot(235)
+            # plt.xlabel("total reward / day")
+            # plt.hist(score.reward, bins=100, range=(-10, 410), alpha=0.5, label=label)
+            # plt.yticks([])
 
-            plt.subplot(235)
-            plt.xlabel("total reward / day")
-            plt.hist(score.reward / n_days, bins=100, range=(-10, 410), alpha=0.3, label=label)
-            plt.yticks([])
-
-            plt.subplot(236)
-            plt.xlabel("waiting time (second)")
-            plt.hist(c[c.status==2].waiting_time, bins=500, range=(0, 650), alpha=0.3, label=label)
+            plt.subplot(224)
+            plt.xlabel("waiting time (s)")
+            plt.hist(c[c.status==2].waiting_time, bins=500, range=(0, 650), alpha=0.5, label=label)
             plt.yticks([])
 
             x = {}
-            x["0_reject_rate"] = float(len(c[c.status == 4])) / len(c)
-            x["1_revenue/hour"] = float(score.earning.sum()) / score.working.sum() * 3600
-            x["2_occupancy_rate"] = score.occupancy_rate.mean()
-            x["3_cruising_rate"] = score.cruising_rate.mean()
-            x["4_working/day"] = float(score.working.sum()) / n_days / len(score) / 3600
-            x["5_waiting_time"] = c[c.status == 2].waiting_time.mean()
+            x["00_reject_rate"] = float(len(c[c.status == 4])) / len(c) * 100
+            x["01_revenue/hour"] = score.revenue_per_hour.mean()
+            x["02_occupancy_rate"] = score.occupancy_rate.mean()
+            x["03_cruising/day"] = score.cruising_hour.mean()
+            x["04_working/day"] = score.working_hour.mean()
+            x["05_waiting_time"] = c[c.status == 2].waiting_time.mean()
+
+            x["11_revenue/hour(std)"] = score.revenue_per_hour.std()
+            x["12_occupancy_rate(std)"] = score.occupancy_rate.std()
+            x["13_cruising/day(std)"] = score.cruising_hour.std()
+            x["14_working/day(std)"] = score.working_hour.std()
+            x["15_waiting_time(std)"] = c[c.status == 2].waiting_time.std()
             data.append(x)
 
         plt.legend()

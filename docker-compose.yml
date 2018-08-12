@@ -6,7 +6,7 @@ services:
     environment:
       OSRM_HOSTPORT: "osrm:5000"
     volumes:
-      - ./movi:/home/movi
+      - ./src:/home/src
       - ./bin:/home/bin
       - ./data:/home/data
       - ./logs:/home/logs

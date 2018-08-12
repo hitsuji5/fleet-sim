@@ -9,4 +9,4 @@ ENV HOME=/home
 WORKDIR $HOME
 COPY ./requirements.txt /$HOME/
 RUN pip3 install -r requirements.txt
-CMD ["python", "movi/run.py"]
+CMD ["python", "src/run.py"]
