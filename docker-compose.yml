@@ -2,7 +2,7 @@ version: '3.1'
 
 services:
   sim:
-    build: .
+    build: ./docker
     environment:
       OSRM_HOSTPORT: "osrm:5000"
     volumes:
@@ -10,7 +10,7 @@ services:
       - ./bin:/home/bin
       - ./data:/home/data
       - ./logs:/home/logs
-    command: sh bin/run.sh
+    command: sh ./bin/run.sh
     depends_on:
       - osrm
 
