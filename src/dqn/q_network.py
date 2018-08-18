@@ -111,10 +111,11 @@ class FittingDeepQNetwork(DeepQNetwork):
 
     def compute_target_value(self, s):
         Q = self.compute_target_q_values(s)
-        amax = np.argmax(self.compute_q_values(s))
-        V = Q[amax]
         if FLAGS.alpha > 0:
-            V += FLAGS.alpha * np.log(np.exp((Q - Q.max()) / FLAGS.alpha).sum())
+            V = Q.max() + FLAGS.alpha * np.log(np.exp((Q - Q.max()) / FLAGS.alpha).sum())
+        else:
+            amax = np.argmax(self.compute_q_values(s))
+            V = Q[amax]
         return V
 
 
