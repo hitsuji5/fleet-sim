@@ -25,7 +25,7 @@ flags.DEFINE_integer('start_time', 1462075200 + 3600 * 4, "simulation start date
 flags.DEFINE_integer('start_offset', 0, "simulation start datetime offset (days)")
 flags.DEFINE_integer('days', 7, "simulation days")
 flags.DEFINE_integer('n_diffusions', 3, "number of diffusion convolution")
-flags.DEFINE_string('tag', 'base', "tag used to identify logs")
+flags.DEFINE_string('tag', 'test', "tag used to identify logs")
 flags.DEFINE_boolean('log_vehicle', False, "whether to log vehicle states")
 flags.DEFINE_boolean('use_osrm', False, "whether to use OSRM")
 flags.DEFINE_boolean('use_average', False, "whether to use diffusion filter or average filter")
@@ -34,8 +34,12 @@ flags.DEFINE_boolean('use_average', False, "whether to use diffusion filter or a
 GAMMA = 0.98  # Discount Factor
 MAX_MOVE = 7
 NUM_SUPPLY_DEMAND_MAPS = 4
-NUM_FEATURES = 41
-
+NUM_FEATURES = 11 + NUM_SUPPLY_DEMAND_MAPS * 3 + FLAGS.n_diffusions * 6
+# time          4
+# location      4
+# fingerprint   2
+# trip time     1
+# total         11
 
 # training hyper parameters
 WORKING_COST = 0.2
