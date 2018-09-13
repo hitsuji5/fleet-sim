@@ -44,5 +44,5 @@ class CustomerRepository(object):
 
     @classmethod
     def delete(cls, customer_id):
-        customer = cls.customers.pop(customer_id, None)
+        cls.customers.pop(customer_id)
 

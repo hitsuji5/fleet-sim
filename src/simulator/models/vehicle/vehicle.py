@@ -1,4 +1,5 @@
-from common import vehicle_status_codes
+from common import vehicle_status_codes, geoutils
+from config.settings import MIN_WORKING_TIME, MAX_WORKING_TIME
 from .vehicle_state import VehicleState
 from .vehicle_behavior import Occupied, Cruising, Idle, Assigned, OffDuty
 from logger import sim_logger
@@ -23,11 +24,13 @@ class Vehicle(object):
         self.__customers = []
         self.__route_plan = []
         self.earnings = 0
+        self.working_time = 0
         self.duration = np.zeros(len(self.behavior_models))
 
 
     # state changing methods
     def step(self, timestep):
+        self.working_time += timestep
         if self.__behavior.available:
             self.state.idle_duration += timestep
         else:
@@ -40,8 +43,15 @@ class Vehicle(object):
             logger.error(self.state.to_msg())
             raise
 
-    def cruise(self, route, triptime, speed):
+    def compute_speed(self, route, triptime):
+        lats, lons = zip(*route)
+        distance = geoutils.great_circle_distance(lats[:-1], lons[:-1], lats[1:], lons[1:])
+        speed = sum(distance) / triptime
+        return speed
+
+    def cruise(self, route, triptime):
         assert self.__behavior.available
+        speed = self.compute_speed(route, triptime)
         self.__reset_plan()
         self.__set_route(route, speed)
         self.__set_destination(route[-1], triptime)
@@ -60,8 +70,7 @@ class Vehicle(object):
         assert self.__behavior.available
         self.__reset_plan()
         self.state.idle_duration = 0
-        offtime = np.random.randint(duration / 2, duration * 3 / 2)
-        self.__set_destination(self.get_location(), offtime)
+        self.__set_destination(self.get_location(), duration)
         self.__change_to_off_duty()
         self.__log()
 
@@ -144,8 +153,17 @@ class Vehicle(object):
         return state
 
     def get_score(self):
-        score = [self.earnings] + self.duration.tolist()
+        score = [self.working_time, self.earnings] + self.duration.tolist()
         return score
+
+    def exit_market(self):
+        if self.__behavior.available:
+            if self.state.idle_duration == 0:
+                return self.working_time > MIN_WORKING_TIME
+            else:
+                return self.working_time > MAX_WORKING_TIME
+        else:
+            return False
 
     def __reset_plan(self):
         self.state.reset_plan()

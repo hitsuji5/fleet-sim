@@ -46,6 +46,7 @@ summary_log_cols = [
 score_log_cols = [
     "t",
     "vehicle_id",
+    "working_time",
     "earning",
     "idle",
     "cruising",
@@ -87,16 +88,17 @@ class LogAnalyzer(object):
 
     def load_score_log(self, log_dir_path, max_num=100, skip_minutes=0):
         df = self._load_score_log(log_dir_path, max_num, skip_minutes)
-        total_seconds = (df.t.max() - df.t.min() + 3600 * 24)
-        n_days = total_seconds / 3600 / 24
-        df = df[df.t == df.t.max()]
-        df["working_hour"] = (total_seconds - df.offduty) / n_days / 3600
-        df["cruising_hour"] = (df.cruising + df.assigned) / n_days / 3600
-        df["occupancy_rate"] = df.occupied / (df.working_hour * n_days * 3600) * 100
+        # total_seconds = (df.t.max() - df.t.min() + 3600 * 24)
+        # n_days = total_seconds / 3600 / 24
+        # df = df[df.t == df.t.max()]
+        # df["working_hour"] = (total_seconds - df.offduty) / n_days / 3600
+        df["working_hour"] = (df.working_time - df.offduty) / 3600
+        df["cruising_hour"] = (df.cruising + df.assigned) / 3600
+        df["occupancy_rate"] = df.occupied / (df.working_hour * 3600) * 100
         df["reward"] = (df.earning
                        - (df.cruising + df.assigned + df.occupied) * DRIVING_COST / settings.TIMESTEP
-                       - (total_seconds - df.offduty) * WORKING_COST / settings.TIMESTEP) / n_days
-        df["revenue_per_hour"] = df.earning / df.working_hour / n_days
+                       - (df.working_time - df.offduty) * WORKING_COST / settings.TIMESTEP)
+        df["revenue_per_hour"] = df.earning / df.working_hour
 
         return df
 
@@ -120,21 +122,26 @@ class LogAnalyzer(object):
 
 
     def plot_summary(self, paths, labels, plt):
-        plt.figure(figsize=(8, 5))
+        plt.figure(figsize=(12, 5))
         plt.subplots_adjust(wspace=0.2, hspace=0.4)
         for i, path in enumerate(paths):
             summary = self.load_summary_log(path)
             summary['t'] = (summary.t / 3600).astype(int) * 3600
             summary = summary.groupby('t').mean().reset_index()
             summary.t = [time_utils.get_local_datetime(t) for t in summary.t]
-            # plt.subplot(211)
-            # plt.plot(summary.t, summary.n_requests, label="request")
-            # plt.plot(summary.t, summary.n_requests - summary.n_matching, label="reject", linestyle=':')
-            # # # plt.plot(summary.t, summary.n_dispatch, label="dispatch", alpha=0.7)
-            # plt.ylabel("count/minute")
-            # plt.ylim([0, 540])
-            # plt.legend()
-            plt.subplot(len(paths), 1, 1+i)
+
+            plt.subplot(len(paths), 2, + i * 2 + 1)
+            plt.plot(summary.t, summary.n_requests, label="request")
+            plt.plot(summary.t, summary.n_requests - summary.n_matching, label="reject", linestyle=':')
+            plt.plot(summary.t, summary.n_dispatch, label="dispatch", alpha=0.7)
+            plt.ylabel("count/minute")
+            plt.ylim([0, 610])
+            if i != len(paths) - 1:
+                plt.xticks([])
+            if i == 0:
+                plt.legend(loc='upper right')
+
+            plt.subplot(len(paths), 2, i * 2 + 2)
             plt.title(labels[i])
             plt.plot(summary.t, summary.n_vehicles, label="working")
             plt.plot(summary.t, summary.occupied_vehicles, label="occupied", linestyle=':')
@@ -151,27 +158,44 @@ class LogAnalyzer(object):
             # plt.xlabel("simulation time (s)")
         return plt
 
+    def plot_metrics_ts(self, paths, labels, plt):
+        plt.figure(figsize=(8, 4))
+        plt.subplots_adjust(wspace=0.2, hspace=0.4)
+        for p, label in zip(paths, labels):
+            score = self.load_score_log(p)
+            score['t'] = ((score.t - score.t.min()) / 3600).astype(int)
+            plt.subplot(131)
+            plt.ylabel("revenue ($/h)")
+            plt.scatter(score.t, score.revenue_per_hour, alpha=0.5, label=label)
+            plt.ylim([0, 1000])
+            plt.subplot(132)
+            plt.ylabel("cruising time (h/day)")
+            plt.scatter(score.t, score.cruising_hour, alpha=0.5, label=label)
+
+        plt.legend()
+        return plt
+
     def plot_metrics(self, paths, labels, plt):
         data = []
         plt.figure(figsize=(8, 4))
         plt.subplots_adjust(wspace=0.2, hspace=0.4)
         for p, label in zip(paths, labels):
             score = self.load_score_log(p)
-            c = self.load_customer_log(p)
+            c = self.load_customer_log(p, skip_minutes=60)
 
-            plt.subplot(221)
+            plt.subplot(131)
             plt.xlabel("revenue ($/h)")
-            plt.hist(score.revenue_per_hour, bins=100, range=(28, 42), alpha=0.5, label=label)
+            plt.hist(score.revenue_per_hour, bins=100, range=(18, 42), alpha=0.5, label=label)
             plt.yticks([])
 
-            plt.subplot(222)
-            plt.xlabel("working time (h/day)")
-            plt.hist(score.working_hour, bins=100, range=(17, 23), alpha=0.5, label=label)
-            plt.yticks([])
+            # plt.subplot(222)
+            # plt.xlabel("working time (h/day)")
+            # plt.hist(score.working_hour, bins=100, range=(17, 23), alpha=0.5, label=label)
+            # plt.yticks([])
 
-            plt.subplot(223)
+            plt.subplot(132)
             plt.xlabel("cruising time (h/day)")
-            plt.hist(score.cruising_hour, bins=100, range=(2.5, 5.5), alpha=0.5, label=label)
+            plt.hist(score.cruising_hour, bins=100, range=(1.9, 7.1), alpha=0.5, label=label)
             plt.yticks([])
 
             # plt.subplot(234)
@@ -184,7 +208,7 @@ class LogAnalyzer(object):
             # plt.hist(score.reward, bins=100, range=(-10, 410), alpha=0.5, label=label)
             # plt.yticks([])
 
-            plt.subplot(224)
+            plt.subplot(133)
             plt.xlabel("waiting time (s)")
             plt.hist(c[c.status==2].waiting_time, bins=500, range=(0, 650), alpha=0.5, label=label)
             plt.yticks([])

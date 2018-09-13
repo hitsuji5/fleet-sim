@@ -1,8 +1,10 @@
+import numpy as np
 from .models.vehicle.vehicle_repository import VehicleRepository
 from .models.customer.customer_repository import CustomerRepository
 from .services.demand_generation_service import DemandGenerator
 from .services.routing_service import RoutingEngine
-from config.settings import REST_DURATION
+from common.time_utils import get_local_datetime
+from config.settings import OFF_DURATION, PICKUP_DURATION
 from logger import sim_logger
 from logging import getLogger
 
@@ -25,8 +27,8 @@ class Simulator(object):
         CustomerRepository.init()
 
 
-    def populate_vehicles(self, vehicle_ids, locations):
-        VehicleRepository.populate(vehicle_ids, locations)
+    def populate_vehicle(self, vehicle_id, location):
+        VehicleRepository.populate(vehicle_id, location)
 
 
     def step(self):
@@ -37,11 +39,15 @@ class Simulator(object):
 
         for vehicle in VehicleRepository.get_all():
             vehicle.step(self.__dt)
-            # if vehicle.get_idle_duration() >= IDLE_DURATION_LIMIT and np.random.random() < REST_PROBABILITY:
-            #     vehicle.take_rest(np.random.randint(REST_DURATION))
+            if vehicle.exit_market():
+                score = ','.join(map(str, [self.get_current_time(), vehicle.get_id()] + vehicle.get_score()))
+                sim_logger.log_score(score)
+                VehicleRepository.delete(vehicle.get_id())
 
         self.__populate_new_customers()
         self.__update_time()
+        if self.__t % 3600 == 0:
+            self.logger.info("Elapsed : {}".format(get_local_datetime(self.__t)))
 
     def match_vehicles(self, commands):
         for command in commands:
@@ -54,8 +60,9 @@ class Simulator(object):
                 self.logger.warning("Invalid Customer id")
                 continue
 
-            vehicle.head_for_customer(customer.get_origin(), command["duration"], customer.get_id())
-            customer.wait_for_vehicle(command["duration"])
+            triptime = command["duration"]
+            vehicle.head_for_customer(customer.get_origin(), triptime, customer.get_id())
+            customer.wait_for_vehicle(triptime)
 
 
     def dispatch_vehicles(self, commands):
@@ -68,21 +75,21 @@ class Simulator(object):
                 continue
 
             if "offduty" in command:
-                vehicle.take_rest(REST_DURATION)
+                off_duration = self.sample_off_duration()
+                vehicle.take_rest(off_duration)
             elif "cache_key" in command:
                 l, a = command["cache_key"]
-                route, triptime, speed = self.routing_engine.get_route_cache(l, a)
-                vehicle.cruise(route, triptime, speed)
+                route, triptime = self.routing_engine.get_route_cache(l, a)
+                vehicle.cruise(route, triptime)
             else:
                 vehicles.append(vehicle)
                 od_pairs.append((vehicle.get_location(), command["destination"]))
         routes = self.routing_engine.route(od_pairs)
 
-        for vehicle, (route, distance, triptime) in zip(vehicles, routes):
+        for vehicle, (route, triptime) in zip(vehicles, routes):
             if triptime == 0:
                 continue
-            speed = distance / triptime
-            vehicle.cruise(route, triptime, speed)
+            vehicle.cruise(route, triptime)
 
     def __update_time(self):
         self.__t += self.__dt
@@ -91,6 +98,11 @@ class Simulator(object):
         new_customers = self.demand_generator.generate(self.__t, self.__dt)
         CustomerRepository.update_customers(new_customers)
 
+    def sample_off_duration(self):
+        return np.random.randint(OFF_DURATION / 2, OFF_DURATION * 3 / 2)
+
+    def sample_pickup_duration(self):
+        return np.random.exponential(PICKUP_DURATION)
 
     def get_current_time(self):
         t = self.__t
@@ -102,7 +114,8 @@ class Simulator(object):
     def get_vehicles_state(self):
         return VehicleRepository.get_states()
 
-    def log_score(self):
-        for vehicle in VehicleRepository.get_all():
-            score = ','.join(map(str, [self.get_current_time(), vehicle.get_id()] + vehicle.get_score()))
-            sim_logger.log_score(score)
+
+    # def log_score(self):
+    #     for vehicle in VehicleRepository.get_all():
+    #         score = ','.join(map(str, [self.get_current_time(), vehicle.get_id()] + vehicle.get_score()))
+    #         sim_logger.log_score(score)

@@ -10,10 +10,9 @@ class VehicleRepository(object):
         cls.vehicles = {}
 
     @classmethod
-    def populate(cls, vehicle_ids, locations):
-        for vehicle_id, location in zip(vehicle_ids, locations):
-            state = VehicleState(vehicle_id, location)
-            cls.vehicles[vehicle_id] = Vehicle(state)
+    def populate(cls, vehicle_id, location):
+        state = VehicleState(vehicle_id, location)
+        cls.vehicles[vehicle_id] = Vehicle(state)
 
     @classmethod
     def get_all(cls):
@@ -30,3 +29,7 @@ class VehicleRepository(object):
         df = pd.DataFrame.from_records(states, columns=cols).set_index("id")
         df["earnings"] = [vehicle.earnings for vehicle in cls.get_all()]
         return df
+
+    @classmethod
+    def delete(cls, vehicle_id):
+        cls.vehicles.pop(vehicle_id)

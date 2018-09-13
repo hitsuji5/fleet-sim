@@ -68,14 +68,18 @@ class FeatureConstructor(object):
         idle = vehicles[(vehicles.status == vehicle_status_codes.IDLE) | (vehicles.status == vehicle_status_codes.CRUISING)]
         occupied = vehicles[vehicles.status == vehicle_status_codes.OCCUPIED]
         occupied = occupied[occupied.time_to_destination <= duration]
-        stopped_vehicle_map = self.construct_supply_map(idle[["lon", "lat"]].values)
+        idle_map = self.construct_supply_map(idle[["lon", "lat"]].values)
         dropoff_map = self.construct_supply_map(occupied[["destination_lon", "destination_lat"]].values)
-        self.supply_maps = [stopped_vehicle_map, dropoff_map]
-        self.diffused_supply = self.diffusion_convolution(sum(self.supply_maps), self.D_in, FLAGS.n_diffusions)
+        self.supply_maps = [idle_map, dropoff_map]
+        self.diffused_supply = []
+        for s in self.supply_maps:
+            self.diffused_supply += self.diffusion_convolution(s, self.D_in, FLAGS.n_diffusions)
 
-    def update_demand(self, demand, normalized_factor=0.1):
-        self.demand_maps = [d * normalized_factor for d in demand]
-        self.diffused_demand = self.diffusion_convolution(sum(self.demand_maps), self.D_out, FLAGS.n_diffusions)
+    def update_demand(self, demand, demand_diff, normalized_factor=0.1):
+        self.demand_maps = [d * normalized_factor for d in demand] + [demand_diff]
+        self.diffused_demand = []
+        for d in self.demand_maps:
+            self.diffused_demand += self.diffusion_convolution(d, self.D_out, FLAGS.n_diffusions)
 
     def diffusion_convolution(self, map, d_filter, k):
         M = map
@@ -115,7 +119,7 @@ class FeatureConstructor(object):
         state_feature = [m.mean() for m in M[:NUM_SUPPLY_DEMAND_MAPS]]
         state_feature += [m[x, y] for m in M]
         state_feature += [m[x, y] for m in self.d_entropy]
-        state_feature += self.construct_location_features(l) + self.construct_time_features(t) + self.construct_fingerprint_features(f)
+        # state_feature += self.construct_location_features(l) + self.construct_time_features(t) + self.construct_fingerprint_features(f)
         return state_feature
 
     def construct_action_features(self, t, l, M):
@@ -139,12 +143,12 @@ class FeatureConstructor(object):
         ax, ay = a
         x_ = x + ax
         y_ = y + ay
-        # if self.is_reachable(x_, y_):
         tt = self.get_triptime(x, y, ax, ay)
         if tt <= 1:
             action_feature = [m[x_, y_] for m in M]
             action_feature += [m[x_, y_] for m in self.d_entropy]
-            action_feature += self.construct_location_features((x_, y_)) + [tt]
+            action_feature += [tt]
+            # action_feature += self.construct_location_features((x_, y_)) + [tt]
             return action_feature
 
         return None

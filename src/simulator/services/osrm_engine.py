@@ -25,7 +25,7 @@ class OSRMEngine(object):
 
         return resultlist
 
-    def route(self, od_list):
+    def route(self, od_list, decode=True):
         """Input list of Origin-Destination latlong pairs, return
         tuple of (trajectory latlongs, distance, triptime)"""
         urllist = [self.get_route_url(origin, destin) for origin, destin in od_list]
@@ -33,18 +33,20 @@ class OSRMEngine(object):
         resultlist = []
         for res in responses:
             route = res["routes"][0]
-            distance = route["distance"]
             triptime = route["duration"]
-            trajectory = polyline.decode(route['geometry'])
-            resultlist.append((trajectory, distance, triptime))
+            if decode:
+                trajectory = polyline.decode(route['geometry'])
+            else:
+                trajectory = route['geometry']
+            resultlist.append((trajectory, triptime))
 
         return resultlist
 
     def get_route_cache(self, l, a):
         if l in self.route_cache:
             if a in self.route_cache[l]:
-                trajectory, distance, triptime = self.route_cache[l][a]
-                return trajectory[:], distance, triptime
+                trajectory, triptime = self.route_cache[l][a]
+                return trajectory[:], triptime
         else:
             self.route_cache[l] = {}
         x, y = l
@@ -52,8 +54,8 @@ class OSRMEngine(object):
         origin = convert_xy_to_lonlat(x, y)
         destin = convert_xy_to_lonlat(x + ax, y + ay)
         self.route_cache[l][a] = self.route([(origin, destin)])[0]
-        trajectory, distance, triptime = self.route_cache[l][a]
-        return trajectory[:], distance, triptime
+        trajectory, triptime = self.route_cache[l][a]
+        return trajectory[:], triptime
 
 
     def eta_one_to_many(self, origin_destins_list):
@@ -74,18 +76,15 @@ class OSRMEngine(object):
             resultlist.append(eta_list)
         return resultlist
 
-    def eta_many_to_many(self, origins_destins_list):
-        urllist = [self.get_eta_many_to_many_url(origins, destins) for origins, destins in origins_destins_list]
-        responses = self.async_requester.send_async_requests(urllist)
-        resultlist = []
-        for res in responses:
-            try:
-                eta_matrix = res["durations"]
-            except:
-                print([(od, res)for od, res in zip(origins_destins_list, responses)])
-                raise
-            resultlist.append(eta_matrix)
-        return resultlist
+    def eta_many_to_many(self, origins, destins):
+        url = self.get_eta_many_to_many_url(origins, destins)
+        res = self.async_requester.send_async_requests([url])[0]
+        try:
+            eta_matrix = res["durations"]
+        except:
+            print(origins, destins, res)
+            raise
+        return eta_matrix
 
 
     def get_route_url(cls, from_latlon, to_latlon):

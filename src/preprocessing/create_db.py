@@ -8,8 +8,8 @@ from db import engine, Session
 
 
 def create_request_backlog(input_file_path, table_name):
-    df= pd.read_csv(input_file_path, index_col='id')
-    print("# of rows {}".format(len(df)))
+    df = pd.read_csv(input_file_path, index_col='id')
+    print("load {} rows".format(len(df)))
     # df.index.name = 'id'
     drop_table = """
     DROP TABLE IF EXISTS {};
@@ -25,6 +25,7 @@ def create_request_backlog(input_file_path, table_name):
     Session.execute(create_index)
     Session.commit()
 
+    print("complete db insert")
 
 
 if __name__ == '__main__':

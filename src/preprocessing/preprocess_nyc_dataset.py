@@ -27,8 +27,7 @@ def remove_outliers(df):
     df = df[(df.trip_time > 60) & (df.trip_time < 3600 * 2)]
     df = df[(df.distance > 100) & (df.distance < 100000)]
     df = df[(df.speed > 2) & (df.speed < 80)]
-    # df = df[df.fare < 52]
-
+    df = df[(df.rpm < 3.0) & (df.rpm > 0.3)]
     return df.drop(['distance', 'speed', 'rpm'], axis=1)
 
 def extract_bounding_box(df, bounding_box):

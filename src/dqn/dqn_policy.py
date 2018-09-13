@@ -28,8 +28,8 @@ class DQNDispatchPolicy(DispatchPolicy):
         if t == 0 or current_time % GLOBAL_STATE_UPDATE_CYCLE == 0:
             self.q_cache = {}
             self.feature_constructor.update_supply(vehicles)
-            demand = self.demand_predictor.predict(current_time, horizon=2)
-            self.feature_constructor.update_demand(demand)
+            demand_profile, profile_diff = self.demand_predictor.predict(current_time, horizon=2)
+            self.feature_constructor.update_demand(demand_profile, profile_diff)
 
         self.feature_constructor.update_time(current_time)
 
@@ -65,12 +65,17 @@ class DQNDispatchPolicy(DispatchPolicy):
             else:
                 s, actions = self.feature_constructor.construct_current_features(x, y)
                 Q = self.q_network.compute_q_values(s)
+
+                # only considers actions whose values are greater than wait action value
+                wait_action_value = Q[0]
+                actions = [a for a, q in zip(actions, Q) if q >= wait_action_value]
+                Q = Q[Q >= wait_action_value]
                 amax = np.argmax(Q)
                 self.q_cache[(x, y)] = actions, Q, amax
-            if actions[amax] == (0, 0):
-                aidx = amax
-            else:
-                aidx = self.q_network.get_action(Q, amax)
+            # if actions[amax] == (0, 0):
+            #     aidx = amax
+            # else:
+            aidx = self.q_network.get_action(Q, amax)
             a = actions[aidx]
             offduty = 1 if Q[aidx] < FLAGS.offduty_threshold else 0
         return a, offduty
@@ -154,7 +159,7 @@ class DQNDispatchPolicyLearner(DQNDispatchPolicy):
         self.backup_supply_demand()
 
         if len(self.supply_demand_history) > settings.INITIAL_MEMORY_SIZE:
-            average_loss, average_q_max = self.train_network(settings.BATCH_SIZE, settings.NUM_ITERATIONS)
+            average_loss, average_q_max = self.train_network(FLAGS.batch_size)
             print("iterations : {}, average_loss : {:.3f}, average_q_max : {:.3f}".format(
                 self.q_network.n_steps, average_loss, average_q_max), flush=True)
             self.q_network.write_summary(average_loss, average_q_max)
@@ -196,7 +201,7 @@ class DQNDispatchPolicyLearner(DQNDispatchPolicy):
         self.last_state_actions[vehicle_id] = (t, l, a)
 
 
-    def train_network(self, batch_size, n_iterations):
+    def train_network(self, batch_size, n_iterations=1):
         loss_sum = 0
         q_max_sum = 0
         for _ in range(n_iterations):

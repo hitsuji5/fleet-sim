@@ -10,7 +10,7 @@ services:
       - ./bin:/home/bin
       - ./data:/home/data
       - ./logs:/home/logs
-    command: sh ./bin/run.sh
+    command: ./bin/run.sh
     depends_on:
       - osrm
 

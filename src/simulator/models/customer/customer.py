@@ -11,10 +11,6 @@ class Customer(object):
     def step(self, timestep):
         if self.status == customer_status_codes.CALLING:
             self.disappear()
-        # if self.status == customer_status_codes.WAITING:
-        #     self.waiting_time += timestep
-        # elif self.status == customer_status_codes.CALLING:
-        #     self.disappear()
 
     def get_id(self):
         customer_id = self.request.id

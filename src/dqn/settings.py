@@ -9,7 +9,7 @@ flags = tf.flags
 FLAGS = flags.FLAGS
 
 flags.DEFINE_float('offduty_threshold', -float('inf'), 'q value off duty threshold')
-flags.DEFINE_float('offduty_probability', 0.20, 'probability to automatically become off duty')
+flags.DEFINE_float('offduty_probability', 0.0, 'probability to automatically become off duty')
 flags.DEFINE_float('alpha', 0.0, 'entropy coefficient')
 flags.DEFINE_string('save_memory_dir', os.path.join(DEFAULT_LOG_DIR, 'memory'), 'replay memory storage')
 flags.DEFINE_string('save_network_dir', os.path.join(DEFAULT_LOG_DIR, 'networks'), 'network model directory')
@@ -21,25 +21,21 @@ flags.DEFINE_boolean('train', False, "run training dqn network.")
 flags.DEFINE_boolean('verbose', False, "print log verbosely.")
 flags.DEFINE_integer('pretrain', 0, "run N pretraining steps using pickled experience memory.")
 flags.DEFINE_integer('vehicles', 8000, "number of vehicles")
-flags.DEFINE_integer('start_time', 1462075200 + 3600 * 4, "simulation start datetime (unixtime)")
+flags.DEFINE_integer('start_time', 1464753600 + 3600 * 5, "simulation start datetime (unixtime)")
 flags.DEFINE_integer('start_offset', 0, "simulation start datetime offset (days)")
 flags.DEFINE_integer('days', 7, "simulation days")
 flags.DEFINE_integer('n_diffusions', 3, "number of diffusion convolution")
+flags.DEFINE_integer('batch_size', 128, "number of samples in a batch for SGD")
 flags.DEFINE_string('tag', 'test', "tag used to identify logs")
 flags.DEFINE_boolean('log_vehicle', False, "whether to log vehicle states")
 flags.DEFINE_boolean('use_osrm', False, "whether to use OSRM")
 flags.DEFINE_boolean('use_average', False, "whether to use diffusion filter or average filter")
-
+flags.DEFINE_boolean('f', False, "")
 
 GAMMA = 0.98  # Discount Factor
 MAX_MOVE = 7
-NUM_SUPPLY_DEMAND_MAPS = 4
-NUM_FEATURES = 11 + NUM_SUPPLY_DEMAND_MAPS * 3 + FLAGS.n_diffusions * 6
-# time          4
-# location      4
-# fingerprint   2
-# trip time     1
-# total         11
+NUM_SUPPLY_DEMAND_MAPS = 5
+NUM_FEATURES = 1 + NUM_SUPPLY_DEMAND_MAPS * (1 + (FLAGS.n_diffusions + 1) * 2) + FLAGS.n_diffusions * 2
 
 # training hyper parameters
 WORKING_COST = 0.2
@@ -52,15 +48,15 @@ STATE_REWARD_TABLE = {
     vehicle_status_codes.OFF_DUTY : 0.0
 }
 WAIT_ACTION_PROBABILITY = 0.70  # wait action probability in epsilon-greedy
-EXPLORATION_STEPS = 5000  # Number of steps over which the initial value of epsilon is linearly annealed to its final value
+EXPLORATION_STEPS = 3000  # Number of steps over which the initial value of epsilon is linearly annealed to its final value
 INITIAL_EPSILON = 1.0  # Initial value of epsilon in epsilon-greedy
 FINAL_EPSILON = 0.01  # Final value of epsilon in epsilon-greedy
 INITIAL_MEMORY_SIZE = 100  # Number of steps to populate the replay memory before training starts
 NUM_SUPPLY_DEMAND_HISTORY = 7 * 24 * 3600 / GLOBAL_STATE_UPDATE_CYCLE + 1 # = 1 week
 MAX_MEMORY_SIZE = 10000000  # Number of replay memory the agent uses for training
 SAVE_INTERVAL = 1000  # The frequency with which the network is saved
-BATCH_SIZE = 128  # Mini batch size
-NUM_ITERATIONS = 1 # Number of batches
+# BATCH_SIZE = 128  # Mini batch size
+# NUM_ITERATIONS = 1 # Number of batches
 TARGET_UPDATE_INTERVAL = 50  # The frequency with which the target network is updated
 LEARNING_RATE = 0.00025  # Learning rate used by RMSProp
 MOMENTUM = 0.95  # Momentum used by RMSProp

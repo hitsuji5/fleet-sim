@@ -22,8 +22,8 @@ class DeepQNetwork(object):
 
     def build_q_network(self):
         sa_input = Input(shape=(settings.NUM_FEATURES, ), dtype='float32')
-        x = Dense(200, activation='relu', name='dense_1')(sa_input)
-        x = Dense(200, activation='relu', name='dense_2')(x)
+        x = Dense(100, activation='relu', name='dense_1')(sa_input)
+        x = Dense(100, activation='relu', name='dense_2')(x)
         q_value = Dense(1, name='q_value')(x)
         model = Model(inputs=sa_input, outputs=q_value)
         return sa_input, q_value, model

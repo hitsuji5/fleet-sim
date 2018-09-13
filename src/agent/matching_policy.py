@@ -37,13 +37,13 @@ class RoughMatchingPolicy(MatchingPolicy):
             return assignments
         d = great_circle_distance(vehicles.lat.values, vehicles.lon.values,
                                   requests.origin_lat.values[:, None], requests.origin_lon.values[:, None])
-        for rid, customer_id in enumerate(requests.index):
-            vid = d[rid].argmin()
-            if d[rid, vid] < self.reject_distance:
-                vehicle_id = vehicles.index[vid]
-                duration = d[rid, vid] / 8.0
-                assignments.append(self.create_command(vehicle_id, customer_id, duration))
-                d[:, vid] = float('inf')
+        for ridx, request_id in enumerate(requests.index):
+            vidx = d[ridx].argmin()
+            if d[ridx, vidx] < self.reject_distance:
+                vehicle_id = vehicles.index[vidx]
+                duration = d[ridx, vidx] / 8.0
+                assignments.append(self.create_command(vehicle_id, request_id, duration))
+                d[:, vidx] = float('inf')
             else:
                 continue
             if len(assignments) == n_vehicles:
@@ -57,7 +57,7 @@ class GreedyMatchingPolicy(MatchingPolicy):
         self.reject_wait_time = 15 * 60         # seconds
         self.k = 3                              # the number of mesh to aggregate
         self.unit_length = 500                  # mesh size in meters
-        self.max_locations = 40
+        self.max_locations = 40                 # max number of origin/destination points
         self.routing_engine = RoutingEngine.create_engine()
 
 
@@ -107,11 +107,6 @@ class GreedyMatchingPolicy(MatchingPolicy):
         candidates = vehicles.index[within_limit_distance]
         d = d[within_limit_distance]
         return candidates[np.argsort(d)[:2 * len(requests) + 1]].tolist()
-
-        # while len(d) > 2.0 * len(requests):
-        #     r *= decay_rate
-        #     d = d[d < r * decay_rate]
-        # return vehicles.index[d_ < r].tolist()
 
 
     def match(self, current_time, vehicles, requests):
@@ -166,7 +161,7 @@ class GreedyMatchingPolicy(MatchingPolicy):
         origins = [(lat, lon) for lat, lon in origins_array.values]
         origin_set = list(set(origins))
         latlon2oi = {latlon: oi for oi, latlon in enumerate(origin_set)}
-        T = np.array(self.routing_engine.eta_many_to_many([(origin_set, destins)])[0], dtype=np.float32)
+        T = np.array(self.routing_engine.eta_many_to_many(origin_set, destins), dtype=np.float32)
         T[np.isnan(T)] = float('inf')
         T = T[[latlon2oi[latlon] for latlon in origins]]
         return T
