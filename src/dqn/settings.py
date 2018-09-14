@@ -9,7 +9,7 @@ flags = tf.flags
 FLAGS = flags.FLAGS
 
 flags.DEFINE_float('offduty_threshold', -float('inf'), 'q value off duty threshold')
-flags.DEFINE_float('offduty_probability', 0.0, 'probability to automatically become off duty')
+flags.DEFINE_float('offduty_probability', 0.1, 'probability to automatically become off duty')
 flags.DEFINE_float('alpha', 0.0, 'entropy coefficient')
 flags.DEFINE_string('save_memory_dir', os.path.join(DEFAULT_LOG_DIR, 'memory'), 'replay memory storage')
 flags.DEFINE_string('save_network_dir', os.path.join(DEFAULT_LOG_DIR, 'networks'), 'network model directory')
@@ -55,8 +55,6 @@ INITIAL_MEMORY_SIZE = 100  # Number of steps to populate the replay memory befor
 NUM_SUPPLY_DEMAND_HISTORY = 7 * 24 * 3600 / GLOBAL_STATE_UPDATE_CYCLE + 1 # = 1 week
 MAX_MEMORY_SIZE = 10000000  # Number of replay memory the agent uses for training
 SAVE_INTERVAL = 1000  # The frequency with which the network is saved
-# BATCH_SIZE = 128  # Mini batch size
-# NUM_ITERATIONS = 1 # Number of batches
 TARGET_UPDATE_INTERVAL = 50  # The frequency with which the target network is updated
 LEARNING_RATE = 0.00025  # Learning rate used by RMSProp
 MOMENTUM = 0.95  # Momentum used by RMSProp
