@@ -29,13 +29,15 @@ flags.DEFINE_integer('batch_size', 128, "number of samples in a batch for SGD")
 flags.DEFINE_string('tag', 'test', "tag used to identify logs")
 flags.DEFINE_boolean('log_vehicle', False, "whether to log vehicle states")
 flags.DEFINE_boolean('use_osrm', False, "whether to use OSRM")
-flags.DEFINE_boolean('use_average', False, "whether to use diffusion filter or average filter")
+flags.DEFINE_boolean('average', False, "whether to use diffusion filter or average filter")
+flags.DEFINE_boolean('trip_diffusion', False, "whether to use trip diffusion")
 flags.DEFINE_boolean('f', False, "")
 
 GAMMA = 0.98  # Discount Factor
 MAX_MOVE = 7
 NUM_SUPPLY_DEMAND_MAPS = 5
-NUM_FEATURES = 1 + NUM_SUPPLY_DEMAND_MAPS * (1 + (FLAGS.n_diffusions + 1) * 2) + FLAGS.n_diffusions * 2
+NUM_FEATURES = 7 + NUM_SUPPLY_DEMAND_MAPS * (1 + (FLAGS.n_diffusions + 1) * 2) + FLAGS.n_diffusions * 2 \
+               + FLAGS.trip_diffusion * 4
 
 # training hyper parameters
 WORKING_COST = 0.2

@@ -5,7 +5,7 @@ from common.time_utils import get_local_datetime
 from config.settings import MAP_WIDTH, MAP_HEIGHT, GLOBAL_STATE_UPDATE_CYCLE,\
     DESTINATION_PROFILE_TEMPORAL_AGGREGATION, DESTINATION_PROFILE_SPATIAL_AGGREGATION
 
-class DemandPredictionService(object):
+class DemandLoader(object):
 
     def __init__(self, timestep=1800, amplification_factor=1.0):
         self.timestep = timestep
@@ -13,7 +13,7 @@ class DemandPredictionService(object):
         self.current_time = None
         self.hourly_demand = []
 
-    def predict(self, t, horizon=2):
+    def load(self, t, horizon=2):
         x = self.update_hourly_demand(t - self.timestep)
         demand = []
 
@@ -30,9 +30,8 @@ class DemandPredictionService(object):
             x += self.timestep / 3600.0
             demand.append(d)
 
-        latest_demand = self.__load_latest_demand(t - self.timestep, t)
+        latest_demand = self.load_latest_demand(t - self.timestep, t)
         return demand[1:], demand[0] - latest_demand
-
 
     def __compute_demand(self, x, d):
         return ((d[1] - d[0]) * x + (d[0] + d[1]) / 2) / 3600.0 * self.timestep * self.amplification_factor
@@ -42,27 +41,13 @@ class DemandPredictionService(object):
         current_time = localtime.month, localtime.day, localtime.hour
         if len(self.hourly_demand) == 0 or self.current_time != current_time:
             self.current_time = current_time
-            self.hourly_demand = [self.__load_demand_profile(t + 60 * (60 * i - 30)) for i in range(max_hours)]
+            self.hourly_demand = [self.load_demand_profile(t + 60 * (60 * i - 30)) for i in range(max_hours)]
 
         x = (localtime.minute - 30) / 60.0
         return x
 
 
-    # def get_hourly_demand(self, t):
-    #     localtime = get_local_datetime(t)
-    #     month, day, hour = localtime.month, localtime.day, localtime.hour
-    #     query = """
-    #       SELECT x, y, demand
-    #       FROM predicted_demand
-    #       WHERE month = {month} and day = {day} and hour = {hour};
-    #             """.format(month=month, day=day, hour=hour)
-    #     demand = pd.read_sql(query, engine, index_col=["x", "y"]).demand
-    #     M = np.zeros((MAP_WIDTH, MAP_HEIGHT))
-    #     for (x, y), c in demand.iteritems():
-    #         M[x, y] += c
-    #     return M
-
-    def __load_demand_profile(self, t):
+    def load_demand_profile(self, t):
         localtime = get_local_datetime(t)
         dayofweek, hour = localtime.weekday(), localtime.hour
         query = """
@@ -76,27 +61,30 @@ class DemandPredictionService(object):
             M[x, y] += c
         return M
 
-    def __load_destination_profile(self, t, alpha=0.1):
+    def load_OD_matrix(self, t, alpha=0.1):
         localtime = get_local_datetime(t)
         dayofweek, hour = localtime.weekday(), localtime.hour
         hours_bin = int(hour / DESTINATION_PROFILE_TEMPORAL_AGGREGATION)
         query = """
-          SELECT origin_x, origin_y, destination_x, destination_y, demand
+          SELECT origin_x, origin_y, destination_x, destination_y, demand, trip_time
           FROM destination_profile
           WHERE dayofweek = {dayofweek} and hours_bin = {hours_bin};
                 """.format(dayofweek=dayofweek, hours_bin=hours_bin)
         df = pd.read_sql(query, engine)
         X_size = int(MAP_WIDTH / DESTINATION_PROFILE_SPATIAL_AGGREGATION) + 1
         Y_size = int(MAP_HEIGHT / DESTINATION_PROFILE_SPATIAL_AGGREGATION) + 1
-        M = np.full((X_size, Y_size, X_size, Y_size), alpha)
-        for ox, oy, dx, dy, c in df.values:
-            M[ox, oy, dx, dy] += c
+        OD = np.full((X_size, Y_size, X_size, Y_size), alpha)
+        TT = np.zeros((X_size, Y_size, X_size, Y_size))
+        for ox, oy, dx, dy, c, tt in df.values:
+            OD[ox, oy, dx, dy] += c
+            TT[ox, oy, dx, dy] = tt
         for ox in range(X_size):
             for oy in range(Y_size):
-                M[ox, oy] /= M[ox, oy].sum()
-        return M
+                OD[ox, oy] /= OD[ox, oy].sum()
+        TT = np.tensordot(TT, OD, axes=[(2, 3), (2, 3)])
+        return OD, TT
 
-    def __load_latest_demand(self, t_start, t_end):
+    def load_latest_demand(self, t_start, t_end):
         query = """
           SELECT x, y, demand
           FROM demand_latest

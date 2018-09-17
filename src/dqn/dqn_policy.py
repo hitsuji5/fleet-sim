@@ -3,7 +3,7 @@ import os
 import numpy as np
 from collections import OrderedDict, defaultdict
 from .settings import FLAGS
-from config.settings import GLOBAL_STATE_UPDATE_CYCLE, MIN_DISPATCH_CYCLE
+from config.settings import GLOBAL_STATE_UPDATE_CYCLE, MIN_DISPATCH_CYCLE, DESTINATION_PROFILE_TEMPORAL_AGGREGATION
 from .feature_constructor import FeatureConstructor
 from .q_network import DeepQNetwork, FittingDeepQNetwork
 from agent.dispatch_policy import DispatchPolicy
@@ -28,8 +28,7 @@ class DQNDispatchPolicy(DispatchPolicy):
         if t == 0 or current_time % GLOBAL_STATE_UPDATE_CYCLE == 0:
             self.q_cache = {}
             self.feature_constructor.update_supply(vehicles)
-            demand_profile, profile_diff = self.demand_predictor.predict(current_time, horizon=2)
-            self.feature_constructor.update_demand(demand_profile, profile_diff)
+            self.feature_constructor.update_demand(current_time)
 
         self.feature_constructor.update_time(current_time)
 

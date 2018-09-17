@@ -1,11 +1,11 @@
 from common import vehicle_status_codes
-from .services.demand_prediction_service import DemandPredictionService
+# from .services.demand_prediction_service import DemandPredictionService
 from config.settings import TIMESTEP, MIN_DISPATCH_CYCLE, MAX_DISPATCH_CYCLE
 import numpy as np
 
 class DispatchPolicy(object):
     def __init__(self):
-        self.demand_predictor = DemandPredictionService()
+        # self.demand_predictor = DemandPredictionService()
         self.updated_at = {}
 
     def dispatch(self, current_time, vehicles):
