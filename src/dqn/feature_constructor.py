@@ -1,5 +1,5 @@
 import numpy as np
-from skimage.transform import downscale_local_mean, rescale
+from skimage.transform import downscale_local_mean, resize
 import os
 from common.time_utils import get_local_datetime
 from config.settings import MAP_WIDTH, MAP_HEIGHT, DATA_DIR, MIN_DISPATCH_CYCLE,\
@@ -91,7 +91,7 @@ class FeatureConstructor(object):
         if FLAGS.trip_diffusion:
             if self.OD is None or t % (DESTINATION_PROFILE_TEMPORAL_AGGREGATION * 3600) == 0:
                 self.OD, self.TT = self.demand_loader.load_OD_matrix(t)
-                self.TT = rescale(self.TT, DESTINATION_PROFILE_SPATIAL_AGGREGATION, mode='edge')
+                self.TT = resize(self.TT, (MAP_WIDTH, MAP_HEIGHT), mode='edge')
 
             d = sum(self.diffused_demand[:horizon])
             self.diffused_demand.append(self.trip_diffusion_convolution(d, self.OD))
@@ -109,7 +109,7 @@ class FeatureConstructor(object):
         n = DESTINATION_PROFILE_SPATIAL_AGGREGATION
         M = downscale_local_mean(img, (n, n))
         M = np.tensordot(trip_filter, M)
-        M = rescale(M, n, mode='edge')
+        M = resize(M, img.shape, mode='edge')
         return M
 
     def diffuse_map(self, img, d_filter):

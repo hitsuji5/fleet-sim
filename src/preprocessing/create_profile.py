@@ -78,11 +78,7 @@ def create_od_profile(df, profile_table, n_weeks):
 
     od_df = df.groupby(['dayofweek', 'hours_bin', 'origin_x', 'origin_y', 'destination_x', 'destination_y']
                         ).trip_time.agg(['count', 'mean'])
-    # od_df = df_agg.size() / float(n_weeks)
-    # od_df.name = 'demand'
-    od_df = od_df.rename({'count' : 'demand', 'mean' : 'trip_time'}).reset_index()
-    # od_df['trip_time'] = df_agg.trip_time.mean()
-
+    od_df = od_df.rename(columns={'count' : 'demand', 'mean' : 'trip_time'}).reset_index()
     drop_table = """
     DROP TABLE IF EXISTS {};
     """.format(profile_table)

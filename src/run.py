@@ -1,14 +1,14 @@
 # import sys
 import os
 # sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
-import argparse
+import numpy as np
 from experiment import Experiment
 from agent.matching_policy import GreedyMatchingPolicy
 from dqn.dqn_policy import DQNDispatchPolicy, DQNDispatchPolicyLearner
 from dqn.settings import NUM_SUPPLY_DEMAND_HISTORY, FLAGS
-from config.settings import TIMESTEP, DEFAULT_LOG_DIR
+from config.settings import TIMESTEP, DEFAULT_LOG_DIR, MAP_WIDTH, MAP_HEIGHT
 from common.time_utils import get_local_datetime
+from common import mesh
 
 
 def setup_base_log_dir(base_log_dir):
@@ -28,6 +28,7 @@ def setup_base_log_dir(base_log_dir):
     if os.path.exists(DEFAULT_LOG_DIR):
         os.unlink(DEFAULT_LOG_DIR)
     os.symlink(base_log_dir, DEFAULT_LOG_DIR)
+
 
 if __name__ == '__main__':
     setup_base_log_dir(FLAGS.tag)
@@ -61,8 +62,15 @@ if __name__ == '__main__':
         matching_policy = GreedyMatchingPolicy()
         dqn_exp = Experiment(start_time, TIMESTEP, dispatch_policy, matching_policy)
         n_steps = int(3600 * 24 / TIMESTEP)
+
+        locations = [mesh.convert_xy_to_lonlat(x, y)[::-1] for x in range(MAP_WIDTH) for y in range(MAP_HEIGHT)]
+
         for _ in range(FLAGS.days):
-            dqn_exp.populate_vehicles(n_vehicles=FLAGS.vehicles)
+            p = dispatch_policy.feature_constructor.demand_loader.load_demand_profile(
+                dqn_exp.simulator.get_current_time() + 3600 * 3)
+            p = p.flatten() / p.sum()
+            vehicle_locations = [locations[i] for i in np.random.choice(len(locations), size=FLAGS.vehicles, p=p)]
+            dqn_exp.populate_vehicles(vehicle_locations)
             for i in range(n_steps):
                 dqn_exp.step(verbose=FLAGS.verbose)
 

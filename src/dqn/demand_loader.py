@@ -67,22 +67,26 @@ class DemandLoader(object):
         hours_bin = int(hour / DESTINATION_PROFILE_TEMPORAL_AGGREGATION)
         query = """
           SELECT origin_x, origin_y, destination_x, destination_y, demand, trip_time
-          FROM destination_profile
+          FROM od_profile
           WHERE dayofweek = {dayofweek} and hours_bin = {hours_bin};
                 """.format(dayofweek=dayofweek, hours_bin=hours_bin)
-        df = pd.read_sql(query, engine)
+        df = pd.read_sql(query, engine, index_col=["origin_x", "origin_y", "destination_x", "destination_y"])
         X_size = int(MAP_WIDTH / DESTINATION_PROFILE_SPATIAL_AGGREGATION) + 1
         Y_size = int(MAP_HEIGHT / DESTINATION_PROFILE_SPATIAL_AGGREGATION) + 1
         OD = np.full((X_size, Y_size, X_size, Y_size), alpha)
         TT = np.zeros((X_size, Y_size, X_size, Y_size))
-        for ox, oy, dx, dy, c, tt in df.values:
-            OD[ox, oy, dx, dy] += c
-            TT[ox, oy, dx, dy] = tt
+        for od, row in df.iterrows():
+            OD[od] += row.demand
+            TT[od] = row.trip_time
         for ox in range(X_size):
             for oy in range(Y_size):
                 OD[ox, oy] /= OD[ox, oy].sum()
-        TT = np.tensordot(TT, OD, axes=[(2, 3), (2, 3)])
-        return OD, TT
+        average_TT = np.zeros((X_size, Y_size))
+        for ox in range(X_size):
+            for oy in range(Y_size):
+               average_TT[ox, oy] = (TT[ox, oy] * OD[ox, oy]).sum()
+        # TT = np.tensordot(TT, OD, axes=[(2, 3), (2, 3)])
+        return OD, average_TT
 
     def load_latest_demand(self, t_start, t_end):
         query = """

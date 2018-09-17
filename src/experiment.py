@@ -1,8 +1,8 @@
 import numpy as np
 from simulator.simulator import Simulator
 from agent.agent import Agent
-from common import vehicle_status_codes, mesh
-from config.settings import MAP_WIDTH, MAP_HEIGHT, ENTERING_TIME_BUFFER
+from common import vehicle_status_codes
+from config.settings import ENTERING_TIME_BUFFER
 from logger import sim_logger
 
 class Experiment(object):
@@ -17,35 +17,19 @@ class Experiment(object):
         # self.simulator.log_score()
         self.simulator.reset(start_time, timestep)
 
-    # def run(self, n_steps):
-    #     self.populate_vehicles(n_vehicles=FLAGS.vehicles)
-    #     for i in range(n_steps):
-    #         self.step(verbose=FLAGS.verbose)
-            # if i % int(3600 / timestep) == 0:
-            #     print("Elapsed : {:.0f} hours".format(i * timestep / 3600.0), flush=True)
-        # self.simulator.log_score()
-
-
-    def populate_vehicles(self, n_vehicles):
+    def populate_vehicles(self, vehicle_locations):
+        n_vehicles = len(vehicle_locations)
         vehicle_ids = range(self.last_vehicle_id, self.last_vehicle_id + n_vehicles)
         self.last_vehicle_id += n_vehicles
 
-        locations = [mesh.convert_xy_to_lonlat(x, y)[::-1] for x in range(MAP_WIDTH) for y in range(MAP_HEIGHT)]
-        p = sum(self.agent.dispatch_policy.demand_predictor.predict(self.simulator.get_current_time())[0])
-        p = p.flatten() / p.sum()
-        vehicle_locations = [locations[i] for i in np.random.choice(len(locations), size=n_vehicles, p=p)]
+        # locations = [mesh.convert_xy_to_lonlat(x, y)[::-1] for x in range(MAP_WIDTH) for y in range(MAP_HEIGHT)]
+        # p = sum(self.agent.dispatch_policy.demand_predictor.predict(self.simulator.get_current_time())[0])
+        # p = p.flatten() / p.sum()
+        # vehicle_locations = [locations[i] for i in np.random.choice(len(locations), size=n_vehicles, p=p)]
         t = self.simulator.get_current_time()
         entering_time = np.random.uniform(t, t + ENTERING_TIME_BUFFER, n_vehicles).tolist()
         q = sorted(zip(entering_time, vehicle_ids, vehicle_locations))
         self.vehicle_queue = q
-
-    # def populate_vehicles(self, n_vehicles):
-    #     vehicle_ids = range(1, n_vehicles + 1)
-    #     locations = [mesh.convert_xy_to_lonlat(x, y)[::-1] for x in range(MAP_WIDTH) for y in range(MAP_HEIGHT)]
-    #     p = self.agent.dispatch_policy.demand_predictor.predict(self.simulator.get_current_time())[0][0]
-    #     p = p.flatten() / p.sum()
-    #     vehicle_locations = [locations[i] for i in np.random.choice(len(locations), size=n_vehicles, p=p)]
-    #     self.simulator.populate_vehicles(vehicle_ids, vehicle_locations)
 
     def enter_market(self):
         t = self.simulator.get_current_time()
