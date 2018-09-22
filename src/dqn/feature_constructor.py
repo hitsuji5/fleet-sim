@@ -81,9 +81,9 @@ class FeatureConstructor(object):
         for s in self.supply_maps:
             self.diffused_supply += self.diffusion_convolution(s, self.D_in, FLAGS.n_diffusions)
 
-    def update_demand(self, t, normalized_factor=0.1, horizon=2):
+    def update_demand(self, t, demand_normalized_factor=0.1, tt_normalized_factor=1.0/1800, horizon=2):
         profile, diff = self.demand_loader.load(t, horizon=horizon)
-        self.demand_maps = [d * normalized_factor for d in profile] + [diff]
+        self.demand_maps = [d * demand_normalized_factor for d in profile] + [diff]
         self.diffused_demand = []
         for d in self.demand_maps:
             self.diffused_demand += self.diffusion_convolution(d, self.D_out, FLAGS.n_diffusions)
@@ -91,7 +91,7 @@ class FeatureConstructor(object):
         if FLAGS.trip_diffusion:
             if self.OD is None or t % (DESTINATION_PROFILE_TEMPORAL_AGGREGATION * 3600) == 0:
                 self.OD, self.TT = self.demand_loader.load_OD_matrix(t)
-                self.TT = resize(self.TT, (MAP_WIDTH, MAP_HEIGHT), mode='edge')
+                self.TT = resize(self.TT * tt_normalized_factor, (MAP_WIDTH, MAP_HEIGHT), mode='edge')
 
             d = sum(self.diffused_demand[:horizon])
             self.diffused_demand.append(self.trip_diffusion_convolution(d, self.OD))

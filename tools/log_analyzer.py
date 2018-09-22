@@ -159,7 +159,7 @@ class LogAnalyzer(object):
         return plt
 
     def plot_metrics_ts(self, paths, labels, plt):
-        plt.figure(figsize=(8, 4))
+        plt.figure(figsize=(12, 4))
         plt.subplots_adjust(wspace=0.2, hspace=0.4)
         for p, label in zip(paths, labels):
             score = self.load_score_log(p)
@@ -167,7 +167,7 @@ class LogAnalyzer(object):
             plt.subplot(131)
             plt.ylabel("revenue ($/h)")
             plt.scatter(score.t, score.revenue_per_hour, alpha=0.5, label=label)
-            plt.ylim([0, 1000])
+            plt.ylim([0, 50])
             plt.subplot(132)
             plt.ylabel("cruising time (h/day)")
             plt.scatter(score.t, score.cruising_hour, alpha=0.5, label=label)
@@ -177,23 +177,23 @@ class LogAnalyzer(object):
 
     def plot_metrics(self, paths, labels, plt):
         data = []
-        plt.figure(figsize=(8, 4))
+        plt.figure(figsize=(12, 3))
         plt.subplots_adjust(wspace=0.2, hspace=0.4)
         for p, label in zip(paths, labels):
             score = self.load_score_log(p)
             c = self.load_customer_log(p, skip_minutes=60)
 
-            plt.subplot(131)
+            plt.subplot(141)
             plt.xlabel("revenue ($/h)")
             plt.hist(score.revenue_per_hour, bins=100, range=(18, 42), alpha=0.5, label=label)
             plt.yticks([])
 
-            # plt.subplot(222)
-            # plt.xlabel("working time (h/day)")
-            # plt.hist(score.working_hour, bins=100, range=(17, 23), alpha=0.5, label=label)
-            # plt.yticks([])
+            plt.subplot(142)
+            plt.xlabel("working time (h/day)")
+            plt.hist(score.working_hour, bins=100, range=(17, 23), alpha=0.5, label=label)
+            plt.yticks([])
 
-            plt.subplot(132)
+            plt.subplot(143)
             plt.xlabel("cruising time (h/day)")
             plt.hist(score.cruising_hour, bins=100, range=(1.9, 7.1), alpha=0.5, label=label)
             plt.yticks([])
@@ -208,7 +208,7 @@ class LogAnalyzer(object):
             # plt.hist(score.reward, bins=100, range=(-10, 410), alpha=0.5, label=label)
             # plt.yticks([])
 
-            plt.subplot(133)
+            plt.subplot(144)
             plt.xlabel("waiting time (s)")
             plt.hist(c[c.status==2].waiting_time, bins=500, range=(0, 650), alpha=0.5, label=label)
             plt.yticks([])

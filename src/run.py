@@ -75,7 +75,11 @@ if __name__ == '__main__':
                 dqn_exp.step(verbose=FLAGS.verbose)
 
         buffer_steps = int(3600 / TIMESTEP)
-        dqn_exp.populate_vehicles(n_vehicles=FLAGS.vehicles)
+        p = dispatch_policy.feature_constructor.demand_loader.load_demand_profile(
+            dqn_exp.simulator.get_current_time() + 3600 * 3)
+        p = p.flatten() / p.sum()
+        vehicle_locations = [locations[i] for i in np.random.choice(len(locations), size=FLAGS.vehicles, p=p)]
+        dqn_exp.populate_vehicles(vehicle_locations)
         for i in range(buffer_steps):
             dqn_exp.step(verbose=FLAGS.verbose)
 
