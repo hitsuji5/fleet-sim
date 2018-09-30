@@ -46,8 +46,8 @@ class DemandLoader(object):
         x = (localtime.minute - 30) / 60.0
         return x
 
-
-    def load_demand_profile(self, t):
+    @staticmethod
+    def load_demand_profile(t):
         localtime = get_local_datetime(t)
         dayofweek, hour = localtime.weekday(), localtime.hour
         query = """
@@ -61,7 +61,8 @@ class DemandLoader(object):
             M[x, y] += c
         return M
 
-    def load_OD_matrix(self, t, alpha=0.1):
+    @staticmethod
+    def load_OD_matrix(t, alpha=0.1):
         localtime = get_local_datetime(t)
         dayofweek, hour = localtime.weekday(), localtime.hour
         hours_bin = int(hour / DESTINATION_PROFILE_TEMPORAL_AGGREGATION)
@@ -88,7 +89,8 @@ class DemandLoader(object):
         # TT = np.tensordot(TT, OD, axes=[(2, 3), (2, 3)])
         return OD, average_TT
 
-    def load_latest_demand(self, t_start, t_end):
+    @staticmethod
+    def load_latest_demand(t_start, t_end):
         query = """
           SELECT x, y, demand
           FROM demand_latest

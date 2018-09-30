@@ -8,6 +8,7 @@ from .settings import MAX_MOVE, NUM_SUPPLY_DEMAND_MAPS, FLAGS
 from common import vehicle_status_codes, mesh
 from .demand_loader import DemandLoader
 
+
 L = MAX_MOVE * 2 + 1
 
 class FeatureConstructor(object):
@@ -44,13 +45,10 @@ class FeatureConstructor(object):
         return np.load(os.path.join(DATA_DIR, 'reachable_map.npy'))
 
     def load_dt_map(self):
-        return np.load(os.path.join(DATA_DIR, 'tt_map.npy')) / MIN_DISPATCH_CYCLE / 2.0
+        return np.load(os.path.join(DATA_DIR, 'tt_map.npy')) / MIN_DISPATCH_CYCLE
 
     def build_diffusion_filter(self):
-        D_out = np.exp(-(self.DT) ** 2)
-        for x, y in self.state_space:
-            D_out[x, y] /= D_out[x, y].sum()
-
+        D_out = np.exp(-(self.DT) ** 2 + 1) / (L ** 2)
         D_in = np.zeros((MAP_WIDTH, MAP_HEIGHT, L, L))
         for x, y in self.state_space:
             for ax, ay in self.action_space_iter(x, y):

@@ -5,6 +5,7 @@ import numpy as np
 from experiment import Experiment
 from agent.matching_policy import GreedyMatchingPolicy
 from dqn.dqn_policy import DQNDispatchPolicy, DQNDispatchPolicyLearner
+from dqn.demand_loader import DemandLoader
 from dqn.settings import NUM_SUPPLY_DEMAND_HISTORY, FLAGS
 from config.settings import TIMESTEP, DEFAULT_LOG_DIR, MAP_WIDTH, MAP_HEIGHT
 from common.time_utils import get_local_datetime
@@ -28,6 +29,14 @@ def setup_base_log_dir(base_log_dir):
     if os.path.exists(DEFAULT_LOG_DIR):
         os.unlink(DEFAULT_LOG_DIR)
     os.symlink(base_log_dir, DEFAULT_LOG_DIR)
+
+
+def sample_initial_locations(t):
+    locations = [mesh.convert_xy_to_lonlat(x, y)[::-1] for x in range(MAP_WIDTH) for y in range(MAP_HEIGHT)]
+    p = DemandLoader.load_demand_profile(t)
+    p = p.flatten() / p.sum()
+    vehicle_locations = [locations[i] for i in np.random.choice(len(locations), size=FLAGS.vehicles, p=p)]
+    return vehicle_locations
 
 
 if __name__ == '__main__':
@@ -62,23 +71,15 @@ if __name__ == '__main__':
         matching_policy = GreedyMatchingPolicy()
         dqn_exp = Experiment(start_time, TIMESTEP, dispatch_policy, matching_policy)
         n_steps = int(3600 * 24 / TIMESTEP)
-
-        locations = [mesh.convert_xy_to_lonlat(x, y)[::-1] for x in range(MAP_WIDTH) for y in range(MAP_HEIGHT)]
+        buffer_steps = int(3600 / TIMESTEP)
 
         for _ in range(FLAGS.days):
-            p = dispatch_policy.feature_constructor.demand_loader.load_demand_profile(
-                dqn_exp.simulator.get_current_time() + 3600 * 3)
-            p = p.flatten() / p.sum()
-            vehicle_locations = [locations[i] for i in np.random.choice(len(locations), size=FLAGS.vehicles, p=p)]
+            vehicle_locations = sample_initial_locations(dqn_exp.simulator.get_current_time() + 3600 * 3)
             dqn_exp.populate_vehicles(vehicle_locations)
             for i in range(n_steps):
                 dqn_exp.step(verbose=FLAGS.verbose)
 
-        buffer_steps = int(3600 / TIMESTEP)
-        p = dispatch_policy.feature_constructor.demand_loader.load_demand_profile(
-            dqn_exp.simulator.get_current_time() + 3600 * 3)
-        p = p.flatten() / p.sum()
-        vehicle_locations = [locations[i] for i in np.random.choice(len(locations), size=FLAGS.vehicles, p=p)]
+        vehicle_locations = sample_initial_locations(dqn_exp.simulator.get_current_time() + 3600 * 3)
         dqn_exp.populate_vehicles(vehicle_locations)
         for i in range(buffer_steps):
             dqn_exp.step(verbose=FLAGS.verbose)
