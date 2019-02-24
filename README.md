@@ -1,10 +1,15 @@
 # Distributed Fleet Control Simulator
+## Reference
+* [MOVI: A Model-Free Approach to Dynamic Fleet Management](https://arxiv.org/pdf/1804.04758.pdf)
+* [Distributed Fleet Control with Maximum Entropy
+Deep Reinforcement Learning](https://openreview.net/pdf?id=SkxWcjx09Q)
 
 ## Setup
 Below you will find step-by-step instructions to set up the NYC taxi simulation using 2016-05 trips for training and 2016-06 trips for evaluation.
+**Please make more than 10 GB memory resource available to Docker Engine.** 
 ### 1. Download OSM Data
 ```commandline
-wget https://download.bbbike.org/osm/bbbike/NewYork/NewYork.osm.pb -P osrm
+wget https://download.bbbike.org/osm/bbbike/NewYork/NewYork.osm.pbf -P osrm
 ```
 
 ### 2. Preprocess OSM Data
